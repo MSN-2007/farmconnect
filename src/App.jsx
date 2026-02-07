@@ -17,6 +17,8 @@ import FarmPlanPage from './pages/farm-plan';
 import ShopsPage from './pages/shops';
 import VetPage from './pages/vet';
 import AIAssistantPage from './pages/ai-assistant';
+import OfflineDataPacks from './pages/offline-data-packs';
+import TestPage from './pages/test';
 
 // Placeholder components for other routes to prevent errors
 const Placeholder = ({ title }) => (
@@ -47,6 +49,8 @@ const router = createBrowserRouter([
       { path: 'shops', element: <ShopsPage /> },
       { path: 'vet', element: <VetPage /> },
       { path: 'ai-assistant', element: <AIAssistantPage /> },
+      { path: 'offline-data', element: <OfflineDataPacks /> },
+      { path: 'test', element: <TestPage /> },
     ],
   },
 ]);
