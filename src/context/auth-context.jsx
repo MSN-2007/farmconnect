@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
@@ -21,7 +22,7 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (phone, password) => {
         try {
-            const res = await fetch('http://localhost:3000/api/auth/login', {
+            const res = await fetch(`${API_URL}/api/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ phone, password })
@@ -44,7 +45,7 @@ export const AuthProvider = ({ children }) => {
 
     const register = async (name, phone, password, role = 'farmer') => {
         try {
-            const res = await fetch('http://localhost:3000/api/auth/register', {
+            const res = await fetch(`${API_URL}/api/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, phone, password, role })
@@ -75,9 +76,8 @@ export const AuthProvider = ({ children }) => {
     };
 
     const loginDeveloper = async (id, password) => {
-        // Map developer Login to real backend
-        // Assuming id is phone for backend consistency, or we update backend to accept email/id
-        // detailed logic skipped for brevity, mapping to standard login:
+        // Map developer Login to standard backend authentication
+        // Assuming id is phone for backend consistency
         return await login(id, password);
     };
 
@@ -92,7 +92,7 @@ export const AuthProvider = ({ children }) => {
     const isFarmer = () => user?.role === 'farmer';
 
     return (
-        <AuthContext.Provider value={{ user, token, loading, login, register, loginFarmer, loginDeveloper, logout, isDeveloper, isFarmer }}>
+        <AuthContext.Provider value={{ user, token, loading, login, register, loginDeveloper, logout, isDeveloper, isFarmer }}>
             {!loading && children}
         </AuthContext.Provider>
     );

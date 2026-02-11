@@ -452,26 +452,6 @@ const AIAssistantPage = () => {
                 </div>
             </div>
 
-            <style dangerouslySetInnerHTML={{
-                __html: `
-                .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 10px; }
-                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #D1D5DB; }
-                .ripple-animation::after {
-                    content: '';
-                    position: absolute;
-                    width: 100%;
-                    height: 100%;
-                    border: 4px solid #EF4444;
-                    border-radius: 50%;
-                    animation: ripple 2s infinite;
-                }
-                @keyframes ripple {
-                    0% { transform: scale(1); opacity: 0.8; }
-                    100% { transform: scale(2); opacity: 0; }
-                }
-            `}} />
         </div>
     );
 };

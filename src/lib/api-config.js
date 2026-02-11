@@ -8,34 +8,34 @@ const REGIONS = ['APAC', 'EMEA', 'AMER'];
 const CURRENT_REGION = 'APAC'; // Dynamic sharding based on IP in production
 
 // 🔒 Backend Proxy Configuration
-const BACKEND_URL = 'http://localhost:3000/api';
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const API_CONFIG = {
     // 🌤️ Weather APIs - Served via Proxy
     weather: {
-        baseUrl: `${BACKEND_URL}/weather`
+        baseUrl: `${BACKEND_URL}/api/weather`
     },
     forecast: {
-        baseUrl: `${BACKEND_URL}/weather/forecast`
+        baseUrl: `${BACKEND_URL}/api/weather/forecast`
     },
     analytics: {
-        baseUrl: `${BACKEND_URL}/analytics`
+        baseUrl: `${BACKEND_URL}/api/analytics`
     },
 
     // 💰 Market & Mandi APIs
     market: {
-        baseUrl: `${BACKEND_URL}/market`
+        baseUrl: `${BACKEND_URL}/api/market`
     },
 
     // 🤖 AI & Intelligence
     ai: {
         type: 'GEMINI',
-        endpoint: `${BACKEND_URL}/ai/generate`
+        endpoint: `${BACKEND_URL}/api/ai/generate`
     },
 
     // 📰 Agriculture News
     news: {
-        baseUrl: `${BACKEND_URL}/news`
+        baseUrl: `${BACKEND_URL}/api/news`
     }
 };
 

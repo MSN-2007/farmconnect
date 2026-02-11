@@ -513,18 +513,6 @@ const WeatherPage = () => {
                 </button>
             </div>
 
-            <style dangerouslySetInnerHTML={{
-                __html: `
-                .no-scrollbar::-webkit-scrollbar { display: none; }
-                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-                .custom-scrollbar::-webkit-scrollbar { height: 4px; }
-                .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); }
-                .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
-                @keyframes ripple {
-                    0% { transform: scale(1); opacity: 0.5; }
-                    100% { transform: scale(3); opacity: 0; }
-                }
-            `}} />
         </div>
     );
 };

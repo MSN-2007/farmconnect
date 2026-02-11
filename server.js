@@ -12,6 +12,9 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { body, validationResult } from 'express-validator';
 import compression from 'compression';
+import mongoSanitize from 'express-mongo-sanitize';
+import cookieParser from 'cookie-parser';
+import hpp from 'hpp';
 
 // Models
 import { User } from './src/models/User.js';
@@ -23,27 +26,69 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// --- Security Middleware ---
-app.use(helmet()); // Secure HTTP headers
+// 🔒 CRITICAL: Validate JWT_SECRET on startup
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.includes('CHANGE_THIS')) {
+    console.error('❌ SECURITY ERROR: JWT_SECRET is not set or uses default value!');
+    console.error('Generate a secure secret with: node -e "console.log(require(\'crypto\').randomBytes(64).toString(\'hex\'))"');
+    process.exit(1);
+}
 
-// Rate Limiting (100 in 15 mins)
+// --- Security Middleware ---
+app.use(helmet({
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            scriptSrc: ["'self'"],
+            imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
+        },
+    },
+})); // Secure HTTP headers with CSP
+
+// General Rate Limiting (100 requests per 15 mins)
 const limiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 100,
     standardHeaders: true,
     legacyHeaders: false,
+    message: 'Too many requests from this IP, please try again later.',
 });
 app.use(limiter);
 
+// Strict Auth Rate Limiting (5 attempts per 15 mins)
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    skipSuccessfulRequests: true,
+    message: 'Too many authentication attempts, please try again after 15 minutes.',
+});
+
 // Strict CORS
+const allowedOrigins = process.env.NODE_ENV === 'production'
+    ? [process.env.FRONTEND_URL]
+    : ['http://localhost:5173', 'http://localhost:4173'];
+
 app.use(cors({
-    origin: ['http://localhost:5173', 'http://localhost:4173'], // Vite default ports
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true, // Allow cookies for future httpOnly JWT implementation
 }));
 
 app.use(express.json({ limit: '10mb' })); // Limit body size to prevent DoS
+app.use(cookieParser()); // Parse cookies for future httpOnly JWT
 app.use(compression()); // Compress all responses
+
+// 🛡️ NoSQL Injection Prevention
+app.use(mongoSanitize({
+    replaceWith: '_',
+    onSanitize: ({ req, key }) => {
+        console.warn(`⚠️ Sanitized NoSQL injection attempt: ${key}`);
+    },
+}));
+
+// 🛡️ HTTP Parameter Pollution Protection
+app.use(hpp());
 
 // --- Configuration ---
 // 1. MongoDB Connection
@@ -85,11 +130,14 @@ const authenticateToken = (req, res, next) => {
 
 // 1. Authentication
 app.post('/api/auth/register',
+    authLimiter, // Apply strict rate limiting
     [
-        body('name').trim().notEmpty().escape(),
-        body('phone').trim().isMobilePhone().withMessage('Invalid phone number'),
-        body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 chars'),
-        body('role').isIn(['farmer', 'consumer', 'expert', 'developer']).optional()
+        body('name').trim().notEmpty().isLength({ max: 100 }).escape().withMessage('Name is required (max 100 chars)'),
+        body('phone').trim().isMobilePhone('en-IN').withMessage('Invalid Indian mobile number'),
+        body('password')
+            .isLength({ min: 8 }).withMessage('Password must be at least 8 chars')
+            .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/).withMessage('Password must contain: uppercase, lowercase, and number'),
+        body('role').optional().isIn(['farmer', 'consumer', 'expert', 'developer']).withMessage('Invalid role')
     ],
     async (req, res) => {
         const errors = validationResult(req);
@@ -99,23 +147,37 @@ app.post('/api/auth/register',
 
         try {
             const { name, phone, password, role } = req.body;
-            const existingUser = await User.findOne({ phone });
-            if (existingUser) return res.status(400).json({ error: 'User already exists' });
 
-            const user = new User({ name, phone, password, role });
+            // Check for existing user
+            const existingUser = await User.findOne({ phone });
+            if (existingUser) {
+                return res.status(400).json({ error: 'Phone number already registered' });
+            }
+
+            const user = new User({ name, phone, password, role: role || 'farmer' });
             await user.save();
 
-            const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
-            res.json({ token, user: { id: user._id, name, role } });
+            const token = jwt.sign(
+                { id: user._id, role: user.role },
+                process.env.JWT_SECRET,
+                { expiresIn: '7d', algorithm: 'HS256' }
+            );
+
+            res.json({
+                token,
+                user: { id: user._id, name: user.name, role: user.role }
+            });
         } catch (error) {
-            res.status(500).json({ error: 'Registration failed' });
+            console.error('Registration error:', error);
+            res.status(500).json({ error: 'Registration failed. Please try again.' });
         }
     });
 
 app.post('/api/auth/login',
+    authLimiter, // Apply strict rate limiting
     [
-        body('phone').trim().notEmpty(),
-        body('password').exists()
+        body('phone').trim().notEmpty().isMobilePhone('en-IN').withMessage('Invalid phone number'),
+        body('password').notEmpty().withMessage('Password is required')
     ],
     async (req, res) => {
         const errors = validationResult(req);
@@ -125,44 +187,85 @@ app.post('/api/auth/login',
 
         try {
             const { phone, password } = req.body;
+
             const user = await User.findOne({ phone });
             if (!user || !(await user.comparePassword(password))) {
-                return res.status(401).json({ error: 'Invalid credentials' });
+                // Use generic error message to prevent user enumeration
+                return res.status(401).json({ error: 'Invalid phone number or password' });
             }
 
-            const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '7d' });
-            res.json({ token, user: { id: user._id, name: user.name, role: user.role } });
+            const token = jwt.sign(
+                { id: user._id, role: user.role },
+                process.env.JWT_SECRET,
+                { expiresIn: '7d', algorithm: 'HS256' }
+            );
+
+            res.json({
+                token,
+                user: { id: user._id, name: user.name, role: user.role }
+            });
         } catch (error) {
-            res.status(500).json({ error: 'Login failed' });
+            console.error('Login error:', error);
+            res.status(500).json({ error: 'Login failed. Please try again.' });
         }
     });
 
-// 2. AI Vision Proxy
-app.post('/api/ai/analyze-image', async (req, res) => {
-    try {
-        const { imageBase64 } = req.body;
-        const apiKey = process.env.VITE_AI_GEMINI_KEY;
-        if (!apiKey) return res.status(500).json({ error: 'Missing AI Key' });
+// 2. AI Vision Proxy (Protected Endpoint)
+app.post('/api/ai/analyze-image',
+    authenticateToken, // Require authentication
+    [
+        body('imageBase64').notEmpty().withMessage('Image data is required'),
+        body('imageBase64').isBase64().withMessage('Invalid image format')
+    ],
+    async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-        const payload = {
-            contents: [{
-                parts: [
-                    { text: "Analyze this plant image. Identify: 1. Crop Name 2. Disease/Pest (if any) 3. Confidence Level 4. Treatment 5. Prevention. Return ONLY JSON format." },
-                    { inline_data: { mime_type: "image/jpeg", data: imageBase64 } }
-                ]
-            }]
-        };
+        try {
+            const { imageBase64 } = req.body;
 
-        const response = await axios.post(url, payload);
-        const text = response.data.candidates[0].content.parts[0].text;
-        const jsonStr = text.replace(/```json|```/g, '').trim();
-        res.json(JSON.parse(jsonStr));
-    } catch (error) {
-        console.error('AI Error:', error.message);
-        res.status(500).json({ error: 'Analysis Failed' });
-    }
-});
+            // Validate image size (max ~7MB base64 = ~5MB actual)
+            if (imageBase64.length > 7 * 1024 * 1024) {
+                return res.status(400).json({ error: 'Image too large (max 5MB)' });
+            }
+
+            const apiKey = process.env.VITE_AI_GEMINI_KEY;
+            if (!apiKey) {
+                console.error('❌ VITE_AI_GEMINI_KEY not configured');
+                return res.status(500).json({ error: 'AI service unavailable' });
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: "Analyze this plant image. Identify: 1. Crop Name 2. Disease/Pest (if any) 3. Confidence Level 4. Treatment 5. Prevention. Return ONLY JSON format." },
+                        { inline_data: { mime_type: "image/jpeg", data: imageBase64 } }
+                    ]
+                }]
+            };
+
+            const response = await axios.post(url, payload, { timeout: 30000 });
+            const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+            if (!text) {
+                return res.status(500).json({ error: 'Invalid AI response' });
+            }
+
+            const jsonStr = text.replace(/```json|```/g, '').trim();
+            res.json(JSON.parse(jsonStr));
+        } catch (error) {
+            console.error('AI Error:', error.message);
+
+            if (error.response?.status === 429) {
+                return res.status(429).json({ error: 'AI service rate limit exceeded. Try again later.' });
+            }
+
+            res.status(500).json({ error: 'Image analysis failed. Please try again.' });
+        }
+    });
 
 // 3. Listings (Buy & Sell)
 app.get('/api/listings', async (req, res) => {
@@ -179,24 +282,40 @@ app.get('/api/listings', async (req, res) => {
     }
 });
 
-app.post('/api/listings', authenticateToken, upload.single('image'), async (req, res) => {
-    try {
-        const listingData = req.body;
-        if (req.file) {
-            listingData.image = req.file.path; // Cloudinary URL
+app.post('/api/listings',
+    authenticateToken,
+    upload.single('image'),
+    [
+        body('name').trim().notEmpty().isLength({ max: 200 }).escape(),
+        body('price').isNumeric().isFloat({ min: 0 }),
+        body('unit').trim().notEmpty().isLength({ max: 50 }),
+        body('quantity').trim().notEmpty(),
+        body('location').trim().notEmpty().isLength({ max: 200 }),
+        body('state').trim().notEmpty().isLength({ max: 100 }),
+        body('phone').trim().isMobilePhone('en-IN'),
+        body('category').trim().notEmpty(),
+        body('description').optional().trim().isLength({ max: 1000 })
+    ],
+    async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
         }
-        // If image comes as base64 (fallback), we might want to upload it to cloudinary here too, 
-        // but for now let's assume client sends multipart/form-data OR we handle base64 separately if needed.
-        // For this specific 'upload.single', client MUST send multipart/form-data.
-        // If client sends JSON with base64, 'req.file' is undefined.
 
-        const listing = new Listing({ ...listingData, seller: req.user.id }); // Link to auth user
-        await listing.save();
-        res.json(listing);
-    } catch (error) {
-        res.status(500).json({ error: 'Creation failed' });
-    }
-});
+        try {
+            const listingData = req.body;
+            if (req.file) {
+                listingData.image = req.file.path; // Cloudinary URL
+            }
+
+            const listing = new Listing({ ...listingData, seller: req.user.id });
+            await listing.save();
+            res.json(listing);
+        } catch (error) {
+            console.error('Listing creation error:', error);
+            res.status(500).json({ error: 'Failed to create listing' });
+        }
+    });
 
 // 4. Community Posts
 app.get('/api/posts', async (req, res) => {
@@ -212,18 +331,32 @@ app.get('/api/posts', async (req, res) => {
     }
 });
 
-app.post('/api/posts', authenticateToken, upload.single('image'), async (req, res) => {
-    try {
-        const postData = req.body;
-        if (req.file) postData.image = req.file.path;
+app.post('/api/posts',
+    authenticateToken,
+    upload.single('image'),
+    [
+        body('content').trim().notEmpty().isLength({ max: 5000 }).withMessage('Content required (max 5000 chars)'),
+        body('community').trim().notEmpty().isLength({ max: 100 }),
+        body('tags').optional().isArray()
+    ],
+    async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
 
-        const post = new Post({ ...postData, author: req.user.id }); // Link to auth user
-        await post.save();
-        res.json(post);
-    } catch (error) {
-        res.status(500).json({ error: 'Post failed' });
-    }
-});
+        try {
+            const postData = req.body;
+            if (req.file) postData.image = req.file.path;
+
+            const post = new Post({ ...postData, author: req.user.id });
+            await post.save();
+            res.json(post);
+        } catch (error) {
+            console.error('Post creation error:', error);
+            res.status(500).json({ error: 'Failed to create post' });
+        }
+    });
 
 app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
     try {

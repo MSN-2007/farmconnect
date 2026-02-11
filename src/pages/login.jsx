@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
-import { Phone, ArrowRight, ShieldCheck, Sprout } from 'lucide-react';
+import { Phone, ArrowRight, ShieldCheck, Sprout, User } from 'lucide-react';
 
 const LoginPage = () => {
     const navigate = useNavigate();
@@ -17,8 +17,25 @@ const LoginPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (phone.length < 10 || password.length < 6) {
-            alert('Please check your inputs.');
+
+        // Enhanced validation
+        if (phone.length < 10) {
+            alert('Please enter a valid 10-digit phone number.');
+            return;
+        }
+
+        if (!isLogin && password.length < 8) {
+            alert('Password must be at least 8 characters.');
+            return;
+        }
+
+        if (!isLogin && !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+            alert('Password must contain at least one uppercase letter, one lowercase letter, and one number.');
+            return;
+        }
+
+        if (isLogin && password.length < 6) {
+            alert('Please enter your password.');
             return;
         }
 
@@ -116,7 +133,7 @@ const LoginPage = () => {
                                     placeholder="••••••••"
                                     className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-transparent focus:border-nature-500 rounded-2xl font-black text-lg outline-none transition-all"
                                     required
-                                    minLength={6}
+                                    minLength={isLogin ? 6 : 8}
                                 />
                             </div>
                         </div>
