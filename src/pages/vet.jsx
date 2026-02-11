@@ -74,7 +74,7 @@ const VetPage = () => {
 
     const handleConfirmBooking = () => {
         // Handle booking confirmation
-        console.log('Booking confirmed:', { expert: selectedExpert, ...bookingData });
+        // Booking confirmed - could send to backend here
         setShowBookingModal(false);
         setBookingData({ date: '', type: 'Video Call', notes: '' });
     };

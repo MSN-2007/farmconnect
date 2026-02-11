@@ -22,6 +22,8 @@ import {
 import { cn } from '../lib/utils';
 import SearchBarWithAutocomplete from '../components/search-bar-autocomplete';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 const CommunityPage = () => {
     // Enhanced categories with icons and descriptions
     const communities = [
@@ -106,7 +108,7 @@ const CommunityPage = () => {
     const fetchPosts = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`http://localhost:3000/api/posts?community=${activeCommunity}`);
+            const res = await fetch(`${API_URL}/api/posts?community=${activeCommunity}`);
             const data = await res.json();
             setPosts(data);
         } catch (error) {
@@ -135,27 +137,18 @@ const CommunityPage = () => {
     const handleCreatePost = async () => {
         if (!newPostContent.trim()) return;
 
-        const token = localStorage.getItem('farmcon_token');
-        if (!token) {
-            alert('Please login to post.');
-            return;
-        }
-
         const formData = new FormData();
         formData.append('content', newPostContent);
         formData.append('community', newPostCommunity);
-        // formData.append('location', 'Your Location'); // Optional, backend can deduce or defaulting
 
         if (newPostImageFile) {
             formData.append('image', newPostImageFile);
         }
 
         try {
-            const res = await fetch('http://localhost:3000/api/posts', {
+            const res = await fetch(`${API_URL}/api/posts`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
+                credentials: 'include',  // Send httpOnly cookie
                 body: formData
             });
 
@@ -188,25 +181,17 @@ const CommunityPage = () => {
 
     // Toggle like
     const toggleLike = async (postId) => {
-        const token = localStorage.getItem('farmcon_token');
-        if (!token) {
-            alert('Please login to like.');
-            return;
-        }
-
         // Optimistic UI update
         const alreadyLiked = likedPosts[postId];
-        if (alreadyLiked) return; // Prevent double like for simple demo
+        if (alreadyLiked) return; // Prevent double like
 
         setLikedPosts(prev => ({ ...prev, [postId]: true }));
         setPosts(posts.map(p => p.id === postId ? { ...p, likes: p.likes + 1 } : p));
 
         try {
-            await fetch(`http://localhost:3000/api/posts/${postId}/like`, {
+            await fetch(`${API_URL}/api/posts/${postId}/like`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+                credentials: 'include'  // Send httpOnly cookie
             });
         } catch (error) {
             console.error('Failed to like post:', error);

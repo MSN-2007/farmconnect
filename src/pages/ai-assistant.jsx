@@ -76,25 +76,25 @@ const AIAssistantPage = () => {
         // 1. First, attempt to get response from the Real AI Gateway (with key rotation)
         const liveResponse = await getAIResponse(query);
         if (liveResponse) {
-            console.log(`AI Gateway Response (Provider: ${liveResponse.provider}):`, liveResponse.text);
+            // AI Gateway response received
             return liveResponse.text;
         }
 
         // 2. Fallback to Local Knowledge Base if API is offline or keys missing
         for (const category in KNOWLEDGE_BASE) {
             if (KNOWLEDGE_BASE[category].keywords.some(k => lower.includes(k))) {
-                console.log("Fallback to Local Knowledge Base.");
+                // Fallback to Local Knowledge Base
                 return KNOWLEDGE_BASE[category].response;
             }
         }
 
         // Default or complex response
         if (lower.length < 5) {
-            console.log("Default short query response.");
+            // Default short query response
             return "I'm listening. Please ask a specific farming question like 'What is the wheat price today?' or 'How to control aphids?'";
         }
 
-        console.log("Default complex query response.");
+        // Default complex query response
         return "I've analyzed your question about '" + query + "'. While I have extensive data on Weather, Mandi Prices, Pests, Fertilizer, Seeds, Irrigation, Livestock, Organic Farming, and Storage, this specific query requires more context. \n\nI recommend checking our specialized modules like 'Farm Plan' for personalized scheduling, or I can connect you with a specialized Krishi Vigyan Kendra expert. Would you like me to find the nearest expert for you?";
     };
 

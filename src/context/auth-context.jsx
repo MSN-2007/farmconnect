@@ -8,22 +8,33 @@ export const AuthProvider = ({ children }) => {
     const [token, setToken] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Initial Load checks for token
+    // Initial Load - check for authentication via cookie
     useEffect(() => {
-        const storedToken = localStorage.getItem('farmcon_token');
-        const storedUser = localStorage.getItem('farmcon_user');
+        const checkAuth = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/auth/me`, {
+                    credentials: 'include' // Important: sends cookie
+                });
 
-        if (storedToken && storedUser) {
-            setToken(storedToken);
-            setUser(JSON.parse(storedUser));
-        }
-        setLoading(false);
+                if (res.ok) {
+                    const data = await res.json();
+                    setUser(data.user);
+                    setToken(true); // Token exists in httpOnly cookie
+                }
+            } catch (error) {
+                // Not authenticated, silent fail
+            } finally {
+                setLoading(false);
+            }
+        };
+        checkAuth();
     }, []);
 
     const login = async (phone, password) => {
         try {
             const res = await fetch(`${API_URL}/api/auth/login`, {
                 method: 'POST',
+                credentials: 'include',  // Important: receive cookie
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ phone, password })
             });
@@ -32,10 +43,9 @@ export const AuthProvider = ({ children }) => {
 
             const data = await res.json();
             setUser(data.user);
-            setToken(data.token);
+            setToken(true); // Token is in cookie
 
-            localStorage.setItem('farmcon_token', data.token);
-            localStorage.setItem('farmcon_user', JSON.stringify(data.user));
+            // No longer using localStorage for tokens
             return true;
         } catch (error) {
             console.error(error);
@@ -47,6 +57,7 @@ export const AuthProvider = ({ children }) => {
         try {
             const res = await fetch(`${API_URL}/api/auth/register`, {
                 method: 'POST',
+                credentials: 'include',  // Important: receive cookie
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, phone, password, role })
             });
@@ -55,10 +66,9 @@ export const AuthProvider = ({ children }) => {
 
             const data = await res.json();
             setUser(data.user);
-            setToken(data.token);
+            setToken(true); // Token is in cookie
 
-            localStorage.setItem('farmcon_token', data.token);
-            localStorage.setItem('farmcon_user', JSON.stringify(data.user));
+            // No longer using localStorage for tokens
             return true;
         } catch (error) {
             console.error(error);
@@ -81,11 +91,19 @@ export const AuthProvider = ({ children }) => {
         return await login(id, password);
     };
 
-    const logout = () => {
-        setUser(null);
-        setToken(null);
-        localStorage.removeItem('farmcon_user');
-        localStorage.removeItem('farmcon_token');
+    const logout = async () => {
+        try {
+            // Call backend to clear cookie
+            await fetch(`${API_URL}/api/auth/logout`, {
+                method: 'POST',
+                credentials: 'include'
+            });
+        } catch (error) {
+            // Silent fail on logout
+        } finally {
+            setUser(null);
+            setToken(null);
+        }
     };
 
     const isDeveloper = () => user?.role === 'developer';

@@ -15,15 +15,36 @@ import compression from 'compression';
 import mongoSanitize from 'express-mongo-sanitize';
 import cookieParser from 'cookie-parser';
 import hpp from 'hpp';
+import csrf from 'csurf';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 // Models
 import { User } from './src/models/User.js';
 import { Listing } from './src/models/Listing.js';
 import { Post } from './src/models/Post.js';
+import { Wishlist } from './src/models/Wishlist.js';
+import { Review } from './src/models/Review.js';
+import { Order } from './src/models/Order.js';
+import { Message, Conversation } from './src/models/Message.js';
 
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
+
+// CORS allowed origins (shared between Express and Socket.io)
+const allowedOrigins = process.env.NODE_ENV === 'production'
+    ? [process.env.FRONTEND_URL]
+    : ['http://localhost:5173', 'http://localhost:4173'];
+
+const io = new Server(httpServer, {
+    cors: {
+        origin: allowedOrigins, // ✅ FIX #3: Aligned with Express CORS
+        credentials: true,
+        methods: ['GET', 'POST']
+    }
+});
 const PORT = process.env.PORT || 3000;
 
 // 🔒 CRITICAL: Validate JWT_SECRET on startup
@@ -63,21 +84,39 @@ const authLimiter = rateLimit({
     message: 'Too many authentication attempts, please try again after 15 minutes.',
 });
 
-// Strict CORS
-const allowedOrigins = process.env.NODE_ENV === 'production'
-    ? [process.env.FRONTEND_URL]
-    : ['http://localhost:5173', 'http://localhost:4173'];
+// ✅ FIX #4: Message Rate Limiting (60 messages per minute)
+const messageLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000,
+    max: 60,
+    message: 'Too many messages, please slow down'
+});
 
+// ✅ FIX #5: Force HTTPS in production
+if (process.env.NODE_ENV === 'production') {
+    app.use((req, res, next) => {
+        if (req.header('x-forwarded-proto') !== 'https') {
+            return res.redirect(`https://${req.header('host')}${req.url}`);
+        }
+        next();
+    });
+}
+
+// Strict CORS
 app.use(cors({
     origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true, // Allow cookies for future httpOnly JWT implementation
+    credentials: true,
 }));
 
 app.use(express.json({ limit: '10mb' })); // Limit body size to prevent DoS
-app.use(cookieParser()); // Parse cookies for future httpOnly JWT
+app.use(cookieParser()); // Parse cookies for httpOnly JWT
 app.use(compression()); // Compress all responses
+
+// ✅ Security Enhancements
+app.use(trackRequest); // Track requests for suspicious activity detection
+app.use(logAuthMiddleware); // Log auth attempts
+app.use(sanitizeInputs); // Sanitize all inputs to prevent XSS
 
 // 🛡️ NoSQL Injection Prevention
 app.use(mongoSanitize({
@@ -89,6 +128,15 @@ app.use(mongoSanitize({
 
 // 🛡️ HTTP Parameter Pollution Protection
 app.use(hpp());
+
+// 🛡️ CSRF Protection (for cookie-based auth)
+const csrfProtection = csrf({ cookie: true });
+app.use(csrfProtection);
+
+// Provide CSRF token to frontend
+app.get('/api/csrf-token', (req, res) => {
+    res.json({ csrfToken: req.csrfToken() });
+});
 
 // --- Configuration ---
 // 1. MongoDB Connection
@@ -114,8 +162,8 @@ const upload = multer({ storage: storage });
 
 // --- Auth Middleware ---
 const authenticateToken = (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    // Read token from httpOnly cookie instead of Authorization header
+    const token = req.cookies.farmcon_token;
 
     if (!token) return res.sendStatus(401);
 
@@ -125,6 +173,47 @@ const authenticateToken = (req, res, next) => {
         next();
     });
 };
+
+// --- Role-Based Access Control Middleware ---
+const requireRole = (...allowedRoles) => (req, res, next) => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+        return res.status(403).json({
+            error: 'Insufficient permissions. Required role: ' + allowedRoles.join(' or ')
+        });
+    }
+    next();
+};
+
+// ✅ FIX #1: Input Validation Arrays
+const orderValidation = [
+    body('listing').isMongoId().withMessage('Invalid listing ID'),
+    body('quantity').isInt({ min: 1, max: 10000 }).withMessage('Quantity must be between 1-10000'),
+    body('deliveryAddress').trim().notEmpty().isLength({ max: 500 }).withMessage('Address required (max 500 chars)'),
+    body('deliveryPhone').trim().isMobilePhone().withMessage('Invalid phone number'),
+    body('deliveryMethod').optional().isIn(['pickup', 'delivery']).withMessage('Invalid delivery method'),
+    body('paymentMethod').optional().isIn(['cod', 'online', 'advance']).withMessage('Invalid payment method'),
+    body('notes').optional().trim().isLength({ max: 500 }).withMessage('Notes too long (max 500 chars)')
+];
+
+const messageValidation = [
+    body('content').trim().notEmpty().isLength({ min: 1, max: 2000 }).withMessage('Message required (max 2000 chars)'),
+    body('messageType').optional().isIn(['text', 'image', 'listing']).withMessage('Invalid message type'),
+    body('listing').optional().isMongoId().withMessage('Invalid listing ID')
+];
+
+const conversationValidation = [
+    body('recipientId').isMongoId().withMessage('Invalid recipient ID'),
+    body('listingId').optional().isMongoId().withMessage('Invalid listing ID')
+];
+
+const orderStatusValidation = [
+    body('status').isIn(['pending', 'confirmed', 'preparing', 'shipped', 'delivered', 'cancelled']).withMessage('Invalid status'),
+    body('note').optional().trim().isLength({ max: 200 }).withMessage('Note too long')
+];
+
+const cancelOrderValidation = [
+    body('reason').trim().notEmpty().isLength({ max: 300 }).withMessage('Cancellation reason required (max 300 chars)')
+];
 
 // --- Routes ---
 
@@ -163,9 +252,17 @@ app.post('/api/auth/register',
                 { expiresIn: '7d', algorithm: 'HS256' }
             );
 
+            // Set httpOnly cookie (XSS protection)
+            res.cookie('farmcon_token', token, {
+                httpOnly: true,           // Prevents JavaScript access
+                secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+                sameSite: 'strict',       // CSRF protection
+                maxAge: 7 * 24 * 60 * 60 * 1000  // 7 days
+            });
+
             res.json({
-                token,
                 user: { id: user._id, name: user.name, role: user.role }
+                // No token in response - it's in httpOnly cookie
             });
         } catch (error) {
             console.error('Registration error:', error);
@@ -189,10 +286,33 @@ app.post('/api/auth/login',
             const { phone, password } = req.body;
 
             const user = await User.findOne({ phone });
+
+            // Check if account is locked
+            if (user && user.lockUntil && user.lockUntil > Date.now()) {
+                return res.status(423).json({
+                    error: 'Account locked due to too many failed attempts. Try again later.'
+                });
+            }
+
             if (!user || !(await user.comparePassword(password))) {
+                // Track failed login attempts
+                if (user) {
+                    user.failedLoginAttempts = (user.failedLoginAttempts || 0) + 1;
+
+                    if (user.failedLoginAttempts >= 5) {
+                        user.lockUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+                    }
+                    await user.save();
+                }
+
                 // Use generic error message to prevent user enumeration
                 return res.status(401).json({ error: 'Invalid phone number or password' });
             }
+
+            // Reset failed attempts on successful login
+            user.failedLoginAttempts = 0;
+            user.lockUntil = undefined;
+            await user.save();
 
             const token = jwt.sign(
                 { id: user._id, role: user.role },
@@ -200,15 +320,41 @@ app.post('/api/auth/login',
                 { expiresIn: '7d', algorithm: 'HS256' }
             );
 
+            // Set httpOnly cookie (XSS protection)
+            res.cookie('farmcon_token', token, {
+                httpOnly: true,           // Prevents JavaScript access
+                secure: process.env.NODE_ENV === 'production', // HTTPS only in production
+                sameSite: 'strict',       // CSRF protection
+                maxAge: 7 * 24 * 60 * 60 * 1000  // 7 days
+            });
+
             res.json({
-                token,
                 user: { id: user._id, name: user.name, role: user.role }
+                // No token in response - it's in httpOnly cookie
             });
         } catch (error) {
             console.error('Login error:', error);
             res.status(500).json({ error: 'Login failed. Please try again.' });
         }
     });
+
+// Check authentication status
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select('-password');
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        res.json({ user: { id: user._id, name: user.name, role: user.role } });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch user' });
+    }
+});
+
+// Logout endpoint (clear cookie)
+app.post('/api/auth/logout', (req, res) => {
+    res.clearCookie('farmcon_token');
+    res.json({ success: true });
+});
 
 // 2. AI Vision Proxy (Protected Endpoint)
 app.post('/api/ai/analyze-image',
@@ -231,9 +377,9 @@ app.post('/api/ai/analyze-image',
                 return res.status(400).json({ error: 'Image too large (max 5MB)' });
             }
 
-            const apiKey = process.env.VITE_AI_GEMINI_KEY;
+            const apiKey = process.env.AI_GEMINI_KEY;
             if (!apiKey) {
-                console.error('❌ VITE_AI_GEMINI_KEY not configured');
+                console.error('❌ AI_GEMINI_KEY not configured');
                 return res.status(500).json({ error: 'AI service unavailable' });
             }
 
@@ -284,6 +430,7 @@ app.get('/api/listings', async (req, res) => {
 
 app.post('/api/listings',
     authenticateToken,
+    requireRole('farmer', 'developer'),  // Only farmers and developers can create listings
     upload.single('image'),
     [
         body('name').trim().notEmpty().isLength({ max: 200 }).escape(),
@@ -333,6 +480,7 @@ app.get('/api/posts', async (req, res) => {
 
 app.post('/api/posts',
     authenticateToken,
+    requireRole('farmer', 'expert', 'consumer', 'developer'),  // All roles can post
     upload.single('image'),
     [
         body('content').trim().notEmpty().isLength({ max: 5000 }).withMessage('Content required (max 5000 chars)'),
@@ -375,7 +523,7 @@ app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
 app.get('/api/weather', async (req, res) => {
     try {
         const { lat, lon } = req.query;
-        const apiKey = process.env.VITE_WEATHER_API_KEY_APAC;
+        const apiKey = process.env.WEATHER_API_KEY;
         if (!apiKey) return res.status(500).json({ error: 'Missing Weather Key' });
 
         const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
@@ -387,7 +535,7 @@ app.get('/api/weather', async (req, res) => {
 app.get('/api/weather/forecast', async (req, res) => {
     try {
         const { lat, lon } = req.query;
-        const apiKey = process.env.VITE_WEATHER_API_KEY_APAC;
+        const apiKey = process.env.WEATHER_API_KEY;
         if (!apiKey) return res.status(500).json({ error: 'Missing Weather Key' });
 
         const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
@@ -399,24 +547,635 @@ app.get('/api/weather/forecast', async (req, res) => {
 // 6. Analytics (Real-time Graphs)
 import { Metric } from './src/models/Metric.js';
 
-app.get('/api/analytics', authenticateToken, async (req, res) => {
+app.get('/api/analytics',
+    authenticateToken,
+    requireRole('farmer', 'developer'),  // Only farmers and developers
+    async (req, res) => {
+        try {
+            const metrics = await Metric.find({ user: req.user.id }).sort({ date: 1 });
+            res.json(metrics);
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to fetch metrics' });
+        }
+    });
+
+app.post('/api/analytics',
+    authenticateToken,
+    requireRole('farmer', 'developer'),  // Only farmers and developers
+    async (req, res) => {
+        try {
+            const metric = new Metric({ ...req.body, user: req.user.id });
+            await metric.save();
+            res.json(metric);
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to save metric' });
+        }
+    });
+
+// 7. Wishlist Endpoints
+app.post('/api/wishlist/:listingId', authenticateToken, async (req, res) => {
     try {
-        const metrics = await Metric.find({ user: req.user.id }).sort({ date: 1 });
-        res.json(metrics);
+        const wishlistItem = new Wishlist({
+            user: req.user.id,
+            listing: req.params.listingId,
+            notifyOnPriceDrop: req.body.notifyOnPriceDrop !== false
+        });
+        await wishlistItem.save();
+        res.json({ success: true, message: 'Added to wishlist' });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to fetch metrics' });
+        if (error.code === 11000) {
+            return res.status(400).json({ error: 'Already in wishlist' });
+        }
+        res.status(500).json({ error: 'Failed to add to wishlist' });
     }
 });
 
-app.post('/api/analytics', authenticateToken, async (req, res) => {
+app.delete('/api/wishlist/:listingId', authenticateToken, async (req, res) => {
     try {
-        const metric = new Metric({ ...req.body, user: req.user.id });
-        await metric.save();
-        res.json(metric);
+        await Wishlist.deleteOne({ user: req.user.id, listing: req.params.listingId });
+        res.json({ success: true, message: 'Removed from wishlist' });
     } catch (error) {
-        res.status(500).json({ error: 'Failed to save metric' });
+        res.status(500).json({ error: 'Failed to remove from wishlist' });
     }
 });
 
+app.get('/api/wishlist', authenticateToken, async (req, res) => {
+    try {
+        const wishlist = await Wishlist.find({ user: req.user.id })
+            .populate('listing')
+            .sort({ addedAt: -1 });
+        res.json(wishlist);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch wishlist' });
+    }
+});
 
-app.listen(PORT, () => console.log(`✅ FarmConnect Production Server running on http://localhost:${PORT}`));
+// 8. Review Endpoints
+app.post('/api/reviews',
+    authenticateToken,
+    [
+        body('seller').isMongoId(),
+        body('rating').isInt({ min: 1, max: 5 }),
+        body('comment').optional().isLength({ max: 500 }).trim().escape()
+    ],
+    async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+
+        try {
+            const review = new Review({
+                seller: req.body.seller,
+                buyer: req.user.id,
+                listing: req.body.listing,
+                rating: req.body.rating,
+                comment: req.body.comment,
+                qualityRating: req.body.qualityRating,
+                communicationRating: req.body.communicationRating,
+                deliveryRating: req.body.deliveryRating
+            });
+            await review.save();
+            res.json(review);
+        } catch (error) {
+            if (error.code === 11000) {
+                return res.status(400).json({ error: 'You have already reviewed this seller' });
+            }
+            res.status(500).json({ error: 'Failed to submit review' });
+        }
+    }
+);
+
+app.get('/api/reviews/seller/:sellerId', async (req, res) => {
+    try {
+        const reviews = await Review.find({ seller: req.params.sellerId })
+            .populate('buyer', 'name')
+            .sort({ createdAt: -1 })
+            .limit(50);
+        res.json(reviews);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch reviews' });
+    }
+});
+
+// 9. User Profile with Stats
+app.get('/api/users/:userId/profile', async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId).select('-password');
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        // Get user statistics
+        const listingsCount = await Listing.countDocuments({ seller: req.params.userId });
+        const reviewsReceived = await Review.find({ seller: req.params.userId });
+
+        const averageRating = reviewsReceived.length > 0
+            ? (reviewsReceived.reduce((sum, r) => sum + r.rating, 0) / reviewsReceived.length).toFixed(1)
+            : 0;
+
+        res.json({
+            user: {
+                id: user._id,
+                name: user.name,
+                role: user.role,
+                createdAt: user.createdAt
+            },
+            stats: {
+                listingsCount,
+                reviewsCount: reviewsReceived.length,
+                averageRating: parseFloat(averageRating),
+                ratingBreakdown: {
+                    5: reviewsReceived.filter(r => r.rating === 5).length,
+                    4: reviewsReceived.filter(r => r.rating === 4).length,
+                    3: reviewsReceived.filter(r => r.rating === 3).length,
+                    2: reviewsReceived.filter(r => r.rating === 2).length,
+                    1: reviewsReceived.filter(r => r.rating === 1).length
+                }
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+});
+
+// 10. Enhanced Listings with Filters
+app.get('/api/listings', async (req, res) => {
+    try {
+        const {
+            category,
+            state,
+            minPrice,
+            maxPrice,
+            sortBy = 'recent',
+            search
+        } = req.query;
+
+        let query = {};
+
+        if (category && category !== 'All Categories') query.category = category;
+        if (state && state !== 'All States') query.state = state;
+        if (minPrice || maxPrice) {
+            query.price = {};
+            if (minPrice) query.price.$gte = parseInt(minPrice);
+            if (maxPrice) query.price.$lte = parseInt(maxPrice);
+        }
+        if (search) {
+            query.$or = [
+                { name: { $regex: search, $options: 'i' } },
+                { description: { $regex: search, $options: 'i' } },
+                { location: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        let sortOptions = {};
+        switch (sortBy) {
+            case 'price-low':
+                sortOptions = { price: 1 };
+                break;
+            case 'price-high':
+                sortOptions = { price: -1 };
+                break;
+            case 'recent':
+            default:
+                sortOptions = { createdAt: -1 };
+        }
+
+        const listings = await Listing.find(query)
+            .sort(sortOptions)
+            .limit(100);
+
+        res.json(listings);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch listings' });
+    }
+});
+
+// 11. Order Management Endpoints
+app.post('/api/orders', authenticateToken, orderValidation, async (req, res) => {
+    // ✅ FIX #1: Added validation
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+        // Get listing details
+        const listing = await Listing.findById(req.body.listing);
+        if (!listing) {
+            return res.status(404).json({ error: 'Listing not found' });
+        }
+
+        const totalAmount = listing.price * req.body.quantity;
+
+        // Calculate expected delivery (3 days from now)
+        const expectedDelivery = new Date();
+        expectedDelivery.setDate(expectedDelivery.getDate() + 3);
+
+        const order = new Order({
+            buyer: req.user.id,
+            seller: listing.seller,
+            listing: req.body.listing,
+            productName: listing.name,
+            quantity: req.body.quantity,
+            unit: listing.unit || 'kg',
+            pricePerUnit: listing.price,
+            totalAmount,
+            deliveryAddress: req.body.deliveryAddress,
+            deliveryPhone: req.body.deliveryPhone,
+            deliveryMethod: req.body.deliveryMethod || 'delivery',
+            paymentMethod: req.body.paymentMethod || 'cod',
+            buyerNotes: req.body.notes,
+            expectedDelivery,
+            statusHistory: [{
+                status: 'pending',
+                timestamp: new Date(),
+                note: 'Order placed'
+            }]
+        });
+
+        await order.save();
+        res.json(order);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create order' });
+    }
+});
+
+// Get user's orders (buyer)
+app.get('/api/orders', authenticateToken, async (req, res) => {
+    try {
+        const orders = await Order.find({ buyer: req.user.id })
+            .sort({ orderDate: -1 });
+        res.json(orders);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch orders' });
+    }
+});
+
+// Get seller's orders
+app.get('/api/orders/seller', authenticateToken, async (req, res) => {
+    try {
+        const orders = await Order.find({ seller: req.user.id })
+            .sort({ orderDate: -1 });
+        res.json(orders);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch orders' });
+    }
+});
+
+// Get single order
+app.get('/api/orders/:orderId', authenticateToken, async (req, res) => {
+    try {
+        const order = await Order.findById(req.params.orderId);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Check if user is buyer or seller
+        if (order.buyer._id.toString() !== req.user.id && order.seller._id.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        res.json(order);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch order' });
+    }
+});
+
+// Update order status (seller only)
+app.put('/api/orders/:orderId/status', authenticateToken, orderStatusValidation, async (req, res) => {
+    // ✅ FIX #1: Added validation
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+        const order = await Order.findById(req.params.orderId);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Only seller can update status
+        if (order.seller._id.toString() !== req.user.id) {
+            return res.status(403).json({ error: 'Only seller can update order status' });
+        }
+
+        const { status, note } = req.body;
+        order.status = status;
+        order.statusHistory.push({
+            status,
+            timestamp: new Date(),
+            note
+        });
+
+        if (status === 'delivered') {
+            order.deliveredAt = new Date();
+            order.paymentStatus = 'paid';
+        }
+
+        await order.save();
+        res.json(order);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to update order status' });
+    }
+});
+
+// Cancel order
+app.put('/api/orders/:orderId/cancel', authenticateToken, cancelOrderValidation, async (req, res) => {
+    // ✅ FIX #1: Added validation
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+        const order = await Order.findById(req.params.orderId);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Check if user is buyer or seller
+        const isBuyer = order.buyer._id.toString() === req.user.id;
+        const isSeller = order.seller._id.toString() === req.user.id;
+
+        if (!isBuyer && !isSeller) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        // Can't cancel if already shipped or delivered
+        if (['shipped', 'delivered'].includes(order.status)) {
+            return res.status(400).json({ error: 'Cannot cancel order at this stage' });
+        }
+
+        order.status = 'cancelled';
+        order.cancellationReason = req.body.reason;
+        order.cancelledBy = req.user.id;
+        order.statusHistory.push({
+            status: 'cancelled',
+            timestamp: new Date(),
+            note: req.body.reason
+        });
+
+        await order.save();
+        res.json(order);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to cancel order' });
+    }
+});
+
+// 12. Messaging Endpoints
+// Get or create conversation
+app.post('/api/conversations', authenticateToken, messageLimiter, conversationValidation, async (req, res) => {
+    // ✅ FIX #1 & #4: Added validation and rate limiting
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+        const { recipientId, listingId } = req.body;
+
+        // Check if conversation already exists
+        let conversation = await Conversation.findOne({
+            participants: { $all: [req.user.id, recipientId] }
+        }).populate('participants', 'name phone');
+
+        if (!conversation) {
+            conversation = new Conversation({
+                participants: [req.user.id, recipientId],
+                listing: listingId,
+                unreadCount: new Map([
+                    [req.user.id, 0],
+                    [recipientId, 0]
+                ])
+            });
+            await conversation.save();
+            await conversation.populate('participants', 'name phone');
+        }
+
+        res.json(conversation);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to create conversation' });
+    }
+});
+
+// Get user's conversations
+app.get('/api/conversations', authenticateToken, async (req, res) => {
+    try {
+        const conversations = await Conversation.find({
+            participants: req.user.id
+        })
+            .populate('participants', 'name phone')
+            .populate('listing', 'name image')
+            .sort({ lastMessageAt: -1 });
+
+        res.json(conversations);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch conversations' });
+    }
+});
+
+// Get messages in a conversation
+app.get('/api/conversations/:conversationId/messages', authenticateToken, async (req, res) => {
+    try {
+        const conversation = await Conversation.findById(req.params.conversationId);
+        if (!conversation) {
+            return res.status(404).json({ error: 'Conversation not found' });
+        }
+
+        // Check if user is participant
+        if (!conversation.participants.some(p => p.toString() === req.user.id)) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const messages = await Message.find({ conversation: req.params.conversationId })
+            .populate('sender', 'name')
+            .populate('listing', 'name price image')
+            .sort({ createdAt: 1 })
+            .limit(100);
+
+        // Mark messages as read
+        await Message.updateMany(
+            {
+                conversation: req.params.conversationId,
+                recipient: req.user.id,
+                read: false
+            },
+            {
+                read: true,
+                readAt: new Date()
+            }
+        );
+
+        // Reset unread count
+        conversation.unreadCount.set(req.user.id, 0);
+        await conversation.save();
+
+        res.json(messages);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to fetch messages' });
+    }
+});
+
+// Send message (REST endpoint, also available via Socket.io)
+app.post('/api/conversations/:conversationId/messages', authenticateToken, messageLimiter, messageValidation, async (req, res) => {
+    // ✅ FIX #1 & #4: Added validation and rate limiting
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+    try {
+        const conversation = await Conversation.findById(req.params.conversationId);
+        if (!conversation) {
+            return res.status(404).json({ error: 'Conversation not found' });
+        }
+
+        // Check if user is participant
+        if (!conversation.participants.some(p => p.toString() === req.user.id)) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const recipientId = conversation.participants.find(p => p.toString() !== req.user.id);
+
+        const message = new Message({
+            conversation: req.params.conversationId,
+            sender: req.user.id,
+            recipient: recipientId,
+            content: req.body.content,
+            messageType: req.body.messageType || 'text',
+            listing: req.body.listing
+        });
+
+        await message.save();
+        await message.populate('sender', 'name');
+
+        // Update conversation
+        conversation.lastMessage = req.body.content;
+        conversation.lastMessageAt = new Date();
+        const currentUnread = conversation.unreadCount.get(recipientId.toString()) || 0;
+        conversation.unreadCount.set(recipientId.toString(), currentUnread + 1);
+        await conversation.save();
+
+        // Emit via Socket.io
+        io.to(req.params.conversationId).emit('new_message', message);
+
+        res.json(message);
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to send message' });
+    }
+});
+
+// Socket.io connection handling
+const connectedUsers = new Map(); // userId -> socketId
+
+io.on('connection', (socket) => {
+    // Authenticate socket connection
+    const token = socket.handshake.auth.token;
+    if (!token) {
+        socket.disconnect();
+        return;
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        socket.userId = decoded.id;
+        connectedUsers.set(decoded.id, socket.id);
+
+        // Join user's conversations
+        socket.on('join_conversations', async (conversationIds) => {
+            conversationIds.forEach(id => socket.join(id));
+        });
+
+        // Send message
+        socket.on('send_message', async (data) => {
+            try {
+                const { conversationId, content, messageType, listingId } = data;
+
+                const conversation = await Conversation.findById(conversationId);
+                if (!conversation) return;
+
+                const recipientId = conversation.participants.find(p => p.toString() !== socket.userId);
+
+                const message = new Message({
+                    conversation: conversationId,
+                    sender: socket.userId,
+                    recipient: recipientId,
+                    content,
+                    messageType: messageType || 'text',
+                    listing: listingId
+                });
+
+                await message.save();
+                await message.populate('sender', 'name');
+
+                // Update conversation
+                conversation.lastMessage = content;
+                conversation.lastMessageAt = new Date();
+                const currentUnread = conversation.unreadCount.get(recipientId.toString()) || 0;
+                conversation.unreadCount.set(recipientId.toString(), currentUnread + 1);
+                await conversation.save();
+
+                // Emit to conversation room
+                io.to(conversationId).emit('new_message', message);
+
+                // Notify recipient if online
+                const recipientSocketId = connectedUsers.get(recipientId.toString());
+                if (recipientSocketId) {
+                    io.to(recipientSocketId).emit('notification', {
+                        type: 'new_message',
+                        conversationId,
+                        message
+                    });
+                }
+            } catch (error) {
+                socket.emit('error', { message: 'Failed to send message' });
+            }
+        });
+
+        // Typing indicator
+        socket.on('typing', ({ conversationId, isTyping }) => {
+            socket.to(conversationId).emit('user_typing', {
+                userId: socket.userId,
+                isTyping
+            });
+        });
+
+        // Mark messages as read
+        socket.on('mark_read', async ({ conversationId }) => {
+            try {
+                await Message.updateMany(
+                    {
+                        conversation: conversationId,
+                        recipient: socket.userId,
+                        read: false
+                    },
+                    {
+                        read: true,
+                        readAt: new Date()
+                    }
+                );
+
+                const conversation = await Conversation.findById(conversationId);
+                if (conversation) {
+                    conversation.unreadCount.set(socket.userId, 0);
+                    await conversation.save();
+                }
+
+                socket.to(conversationId).emit('messages_read', {
+                    userId: socket.userId
+                });
+            } catch (error) {
+                // Silent fail
+            }
+        });
+
+        socket.on('disconnect', () => {
+            connectedUsers.delete(socket.userId);
+        });
+
+    } catch (error) {
+        socket.disconnect();
+    }
+});
+
+// \u2705 Global Error Handler (must be last middleware)
+app.use(productionErrorHandler);
+
+
+httpServer.listen(PORT, () => console.log(`✅ FarmConnect Production Server running on http://localhost:${PORT}`));

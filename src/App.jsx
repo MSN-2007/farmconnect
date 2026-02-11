@@ -23,8 +23,6 @@ const VetPage = lazy(() => import('./pages/vet'));
 const AIAssistantPage = lazy(() => import('./pages/ai-assistant'));
 const OfflineDataPacks = lazy(() => import('./pages/offline-data-packs'));
 const TestPage = lazy(() => import('./pages/test'));
-const DeveloperLogin = lazy(() => import('./pages/developer-login'));
-const DeveloperDashboard = lazy(() => import('./pages/developer-dashboard'));
 
 // Loading Fallback Component
 const PageLoader = () => (
@@ -59,9 +57,6 @@ const router = createBrowserRouter([
       { path: 'test', element: <Suspense fallback={<PageLoader />}><TestPage /></Suspense> },
     ],
   },
-  // Developer routes (outside main layout)
-  { path: 'developer-login', element: <Suspense fallback={<PageLoader />}><DeveloperLogin /></Suspense> },
-  { path: 'developer-dashboard', element: <Suspense fallback={<PageLoader />}><DeveloperDashboard /></Suspense> },
 ]);
 
 

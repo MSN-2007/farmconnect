@@ -5,7 +5,9 @@ const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
     phone: { type: String, required: true, unique: true },
     password: { type: String, required: true },
-    role: { type: String, enum: ['farmer', 'developer', 'expert'], default: 'farmer' },
+    role: { type: String, enum: ['farmer', 'developer', 'expert', 'consumer'], default: 'farmer' },
+    failedLoginAttempts: { type: Number, default: 0 },
+    lockUntil: { type: Date },
     createdAt: { type: Date, default: Date.now }
 });
 

@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
-import { Search, MapPin, Phone, MessageCircle, Plus, TrendingUp, TrendingDown, X, Upload, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Search, MapPin, Phone, MessageCircle, Plus, TrendingUp, TrendingDown, X, Upload, Image as ImageIcon, Sparkles, Heart, SlidersHorizontal, Star } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { useAuth } from '../context/auth-context';
+import { calculateDistance, formatDistance, getUserLocation } from '../lib/distance';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const BuySellPage = () => {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState('available');
     const [selectedCategory, setSelectedCategory] = useState('All Categories');
     const [selectedState, setSelectedState] = useState('All States');
@@ -10,6 +15,20 @@ const BuySellPage = () => {
     const [showAddModal, setShowAddModal] = useState(false);
     const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
     const [imagePreview, setImagePreview] = useState(null);
+
+    // Enhanced filters
+    const [priceRange, setPriceRange] = useState([0, 50000]);
+    const [sortBy, setSortBy] = useState('recent');
+    const [showFilters, setShowFilters] = useState(false);
+
+    // Wishlist
+    const [wishlistItems, setWishlistItems] = useState(new Set());
+
+    // User location for distance calculation
+    const [userLocation, setUserLocation] = useState(null);
+
+    // Seller ratings cache
+    const [sellerRatings, setSellerRatings] = useState({});
 
     // Add listing form state
     const [newListing, setNewListing] = useState({
@@ -26,6 +45,7 @@ const BuySellPage = () => {
         image: null // Store File object here or separately
     });
     const [imageFile, setImageFile] = useState(null); // Separate state for File object
+    const [additionalImages, setAdditionalImages] = useState([]); // Store multiple images
 
     // ... (categories arrays remain same) ...
 
@@ -41,6 +61,27 @@ const BuySellPage = () => {
             reader.readAsDataURL(file);
         }
     };
+
+    // Handle multiple images
+    const handleAdditionalImages = (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length + additionalImages.length > 4) {
+            alert('Maximum 5 images allowed (1 main + 4 additional)');
+            return;
+        }
+        setAdditionalImages(prev => [...prev, ...files]);
+    };
+
+    const removeAdditionalImage = (index) => {
+        setAdditionalImages(prev => prev.filter((_, i) => i !== index));
+    };
+
+    // Fetch user location on mount
+    React.useEffect(() => {
+        getUserLocation()
+            .then(loc => setUserLocation(loc))
+            .catch(() => { }); // Silent fail if location not available
+    }, []);
 
     // Handle add listing
     const handleAddListing = async () => {
@@ -61,22 +102,15 @@ const BuySellPage = () => {
         formData.append('description', newListing.description);
         formData.append('negotiable', newListing.negotiable);
 
+
         if (imageFile) {
             formData.append('image', imageFile);
         }
 
-        const token = localStorage.getItem('farmcon_token');
-        if (!token) {
-            alert('You must be logged in to list produce.');
-            return;
-        }
-
         try {
-            const res = await fetch('http://localhost:3000/api/listings', {
+            const res = await fetch(`${API_URL}/api/listings`, {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
+                credentials: 'include',  // Send httpOnly cookie
                 body: formData
             });
 
@@ -125,12 +159,60 @@ const BuySellPage = () => {
     const filteredListings = produceListings.filter(item => {
         const categoryMatch = selectedCategory === 'All Categories' || item.category === selectedCategory;
         const stateMatch = selectedState === 'All States' || item.state === selectedState;
+        const priceMatch = item.price >= priceRange[0] && item.price <= priceRange[1];
         const searchMatch = searchQuery === '' ||
             item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
             item.seller.toLowerCase().includes(searchQuery.toLowerCase()) ||
             item.location.toLowerCase().includes(searchQuery.toLowerCase());
-        return categoryMatch && stateMatch && searchMatch;
+        return categoryMatch && stateMatch && priceMatch && searchMatch;
     });
+
+    // Sort filtered listings
+    const sortedListings = [...filteredListings].sort((a, b) => {
+        switch (sortBy) {
+            case 'price-low':
+                return a.price - b.price;
+            case 'price-high':
+                return b.price - a.price;
+            case 'recent':
+            default:
+                return 0; // Assuming already sorted by recent
+        }
+    });
+
+    // Wishlist functions
+    const toggleWishlist = async (listingId) => {
+        if (!user) {
+            alert('Please login to add to wishlist');
+            return;
+        }
+
+        const isInWishlist = wishlistItems.has(listingId);
+
+        try {
+            if (isInWishlist) {
+                await fetch(`${API_URL}/api/wishlist/${listingId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                setWishlistItems(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(listingId);
+                    return newSet;
+                });
+            } else {
+                await fetch(`${API_URL}/api/wishlist/${listingId}`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ notifyOnPriceDrop: true })
+                });
+                setWishlistItems(prev => new Set([...prev, listingId]));
+            }
+        } catch (error) {
+            console.error('Wishlist error:', error);
+        }
+    };
 
     return (
         <div className="max-w-7xl mx-auto py-6">
@@ -226,6 +308,46 @@ const BuySellPage = () => {
                 ))}
             </div>
 
+            {/* Enhanced Filters Bar */}
+            <div className="mb-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                    {/* Price Range */}
+                    <div className="flex-1 min-w-[250px]">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Price Range:  ₹{priceRange[0].toLocaleString()} - ₹{priceRange[1].toLocaleString()}
+                        </label>
+                        <input
+                            type="range"
+                            min="0"
+                            max="50000"
+                            step="500"
+                            value={priceRange[1]}
+                            onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
+                            className="w-full"
+                        />
+                    </div>
+
+                    {/* Sort Dropdown */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                        <select
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-nature-500"
+                        >
+                            <option value="recent">Newest First</option>
+                            <option value="price-low">Price: Low to High</option>
+                            <option value="price-high">Price: High to Low</option>
+                        </select>
+                    </div>
+
+                    {/* Results Count */}
+                    <div className="text-sm text-gray-600">
+                        Showing <span className="font-bold text-nature-700">{sortedListings.length}</span> listings
+                    </div>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Content */}
                 <div className="lg:col-span-2">
@@ -258,14 +380,29 @@ const BuySellPage = () => {
                     {/* Listings */}
                     {activeTab === 'available' && (
                         <div className="space-y-4">
-                            {filteredListings.length === 0 ? (
+                            {sortedListings.length === 0 ? (
                                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
                                     <p className="text-gray-500 font-medium">No listings found</p>
                                     <p className="text-gray-400 text-sm">Try adjusting your filters</p>
                                 </div>
                             ) : (
-                                filteredListings.map(item => (
-                                    <div key={item.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow">
+                                sortedListings.map(item => (
+                                    <div key={item.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 hover:shadow-md transition-shadow relative">
+                                        {/* Wishlist Heart Button */}
+                                        <button
+                                            onClick={() => toggleWishlist(item.id)}
+                                            className="absolute top-4 right-4 p-2 rounded-full bg-white shadow-md hover:shadow-lg transition-all z-10"
+                                        >
+                                            <Heart
+                                                className={cn(
+                                                    "h-5 w-5 transition-colors",
+                                                    wishlistItems.has(item.id)
+                                                        ? "fill-red-500 text-red-500"
+                                                        : "text-gray-400 hover:text-red-500"
+                                                )}
+                                            />
+                                        </button>
+
                                         <div className="flex items-start justify-between mb-4">
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 mb-2">
@@ -281,10 +418,28 @@ const BuySellPage = () => {
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p className="text-sm text-gray-600 mb-1">Seller: {item.seller}</p>
+                                                <p className="text-sm text-gray-600 mb-1">
+                                                    Seller: {item.seller}
+                                                    {item.sellerId && sellerRatings[item.sellerId] > 0 && (
+                                                        <span className="ml-2 inline-flex items-center gap-1 text-yellow-600">
+                                                            <Star className="h-3 w-3 fill-yellow-400" />
+                                                            <span className="font-medium">{sellerRatings[item.sellerId].toFixed(1)}</span>
+                                                        </span>
+                                                    )}
+                                                </p>
                                                 <div className="flex items-center gap-1 text-sm text-gray-500">
                                                     <MapPin className="h-4 w-4" />
                                                     {item.location}
+                                                    {userLocation && item.lat && item.lon && (
+                                                        <span className="ml-2 text-nature-600 font-medium">
+                                                            • {formatDistance(calculateDistance(
+                                                                userLocation.lat,
+                                                                userLocation.lon,
+                                                                item.lat,
+                                                                item.lon
+                                                            ))}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="text-right">

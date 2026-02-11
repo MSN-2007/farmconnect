@@ -2,6 +2,8 @@ import React, { useState, useRef } from 'react';
 import { Camera, Upload, AlertCircle, History, Download, X, Loader } from 'lucide-react';
 import { cn } from '../lib/utils';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+
 const AILensPage = () => {
     const [activeTab, setActiveTab] = useState('scan');
     const [aiModelLoaded, setAiModelLoaded] = useState(false);
@@ -66,7 +68,7 @@ const AILensPage = () => {
             // Remove data:image/jpeg;base64, prefix if present for API
             const base64Data = imageData.split(',')[1];
 
-            const response = await fetch('http://localhost:3000/api/ai/analyze-image', {
+            const response = await fetch(`${API_URL}/api/ai/analyze-image`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ imageBase64: base64Data })
