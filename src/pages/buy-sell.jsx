@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, MapPin, Phone, MessageCircle, Plus, TrendingUp, TrendingDown, X } from 'lucide-react';
+import { Search, MapPin, Phone, MessageCircle, Plus, TrendingUp, TrendingDown, X, Upload, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 const BuySellPage = () => {
@@ -8,6 +8,8 @@ const BuySellPage = () => {
     const [selectedState, setSelectedState] = useState('All States');
     const [searchQuery, setSearchQuery] = useState('');
     const [showAddModal, setShowAddModal] = useState(false);
+    const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+    const [imagePreview, setImagePreview] = useState(null);
 
     // Add listing form state
     const [newListing, setNewListing] = useState({
@@ -20,179 +22,104 @@ const BuySellPage = () => {
         state: 'Punjab',
         phone: '',
         description: '',
-        negotiable: true
+        negotiable: true,
+        image: null // Store File object here or separately
     });
+    const [imageFile, setImageFile] = useState(null); // Separate state for File object
 
-    const categories = [
-        'All Categories',
-        'Vegetables',
-        'Fruits',
-        'Grains',
-        'Seeds',
-        'Fertilizers',
-        'Equipment',
-        'Raw Materials',
-        'Organic'
-    ];
+    // ... (categories arrays remain same) ...
 
-    const vegetables = [
-        'Tomatoes', 'Potatoes', 'Onions', 'Cabbage', 'Cauliflower',
-        'Carrots', 'Beans', 'Peas', 'Spinach', 'Brinjal', 'Okra', 'Cucumber'
-    ];
-
-    const fruits = [
-        'Apples', 'Bananas', 'Mangoes', 'Oranges', 'Grapes',
-        'Pomegranate', 'Watermelon', 'Papaya', 'Guava', 'Pineapple'
-    ];
-
-    const grains = [
-        'Wheat', 'Rice', 'Maize', 'Barley', 'Bajra', 'Jowar'
-    ];
-
-    const states = [
-        'All States',
-        'Punjab',
-        'Haryana',
-        'Gujarat',
-        'Maharashtra',
-        'Uttar Pradesh',
-        'Rajasthan',
-        'Karnataka',
-        'Tamil Nadu',
-        'Andhra Pradesh'
-    ];
-
-    const units = ['kg', 'Quintal', 'Ton', 'Bag', 'Bale', 'Piece'];
-
-    const [produceListings, setProduceListings] = useState([
-        {
-            id: 1,
-            name: 'Organic Wheat',
-            seller: 'Ramesh Verma',
-            price: 2200,
-            unit: 'Quintal',
-            quantity: '50 Quintal available',
-            location: 'Khanna, Ludhiana, Punjab',
-            phone: '+91 98765 43210',
-            description: 'Premium quality organic wheat, grown without chemical fertilizers. Ready for immediate delivery.',
-            verified: true,
-            negotiable: true,
-            category: 'Grains',
-            state: 'Punjab'
-        },
-        {
-            id: 2,
-            name: 'Basmati Rice',
-            seller: 'Sunita Devi',
-            price: 3400,
-            unit: 'Quintal',
-            quantity: '100 Quintal available',
-            location: 'Karnal, Haryana',
-            phone: '+91 98765 43211',
-            description: 'Grade A Basmati rice, perfect for export quality. Bulk orders available.',
-            verified: true,
-            negotiable: false,
-            category: 'Grains',
-            state: 'Haryana'
-        },
-        {
-            id: 3,
-            name: 'Cotton Bales',
-            seller: 'Vijay Singh',
-            price: 7000,
-            unit: 'Bale',
-            quantity: '25 Bales available',
-            location: 'Gondal, Rajkot, Gujarat',
-            phone: '+91 99887 76655',
-            description: 'High quality cotton bales, suitable for textile manufacturing.',
-            verified: false,
-            negotiable: true,
-            category: 'Raw Materials',
-            state: 'Gujarat'
-        },
-        {
-            id: 4,
-            name: 'Organic Tomatoes',
-            seller: 'Priya Sharma',
-            price: 30,
-            unit: 'kg',
-            quantity: '500 kg available',
-            location: 'Nashik, Maharashtra',
-            phone: '+91 98765 43213',
-            description: 'Fresh organic tomatoes, harvested this morning. Perfect for wholesale markets.',
-            verified: true,
-            negotiable: true,
-            category: 'Vegetables',
-            state: 'Maharashtra'
-        },
-        {
-            id: 5,
-            name: 'Premium Wheat Seeds',
-            seller: 'Harjeet Kaur',
-            price: 4500,
-            unit: 'Quintal',
-            quantity: '30 Quintal available',
-            location: 'Patiala, Punjab',
-            phone: '+91 98765 43214',
-            description: 'Certified wheat seeds with high germination rate. Suitable for winter sowing.',
-            verified: true,
-            negotiable: false,
-            category: 'Seeds',
-            state: 'Punjab'
+    // Handle image upload
+    const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImageFile(file); // Store file for upload
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setImagePreview(reader.result); // Preview only
+            };
+            reader.readAsDataURL(file);
         }
-    ]);
-
-    const marketPrices = [
-        { crop: 'Wheat', price: 2150, change: 5.2, trend: 'up' },
-        { crop: 'Rice', price: 3200, change: 2.1, trend: 'down' },
-        { crop: 'Cotton', price: 6800, change: 6.5, trend: 'up' }
-    ];
-
-    // Get product suggestions based on category
-    const getProductSuggestions = () => {
-        if (newListing.category === 'Vegetables') return vegetables;
-        if (newListing.category === 'Fruits') return fruits;
-        if (newListing.category === 'Grains') return grains;
-        return [];
     };
 
     // Handle add listing
-    const handleAddListing = () => {
+    const handleAddListing = async () => {
         if (!newListing.name || !newListing.price || !newListing.quantity || !newListing.location || !newListing.phone) {
             alert('Please fill all required fields');
             return;
         }
 
-        const listing = {
-            id: Date.now(),
-            name: newListing.name,
-            seller: 'You',
-            price: parseFloat(newListing.price),
-            unit: newListing.unit,
-            quantity: `${newListing.quantity} ${newListing.unit} available`,
-            location: newListing.location,
-            phone: newListing.phone,
-            description: newListing.description,
-            verified: false,
-            negotiable: newListing.negotiable,
-            category: newListing.category,
-            state: newListing.state
-        };
+        const formData = new FormData();
+        formData.append('name', newListing.name);
+        formData.append('category', newListing.category);
+        formData.append('price', newListing.price);
+        formData.append('unit', newListing.unit);
+        formData.append('quantity', `${newListing.quantity} ${newListing.unit} available`);
+        formData.append('location', newListing.location);
+        formData.append('state', newListing.state);
+        formData.append('phone', newListing.phone);
+        formData.append('description', newListing.description);
+        formData.append('negotiable', newListing.negotiable);
 
-        setProduceListings([listing, ...produceListings]);
-        setShowAddModal(false);
-        setNewListing({
-            name: '',
-            category: 'Vegetables',
-            price: '',
-            unit: 'kg',
-            quantity: '',
-            location: '',
-            state: 'Punjab',
-            phone: '',
-            description: '',
-            negotiable: true
-        });
+        if (imageFile) {
+            formData.append('image', imageFile);
+        }
+
+        const token = localStorage.getItem('farmcon_token');
+        if (!token) {
+            alert('You must be logged in to list produce.');
+            return;
+        }
+
+        try {
+            const res = await fetch('http://localhost:3000/api/listings', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+
+            if (res.ok) {
+                const newItem = await res.json();
+                setProduceListings([newItem, ...produceListings]);
+                setShowAddModal(false);
+                setImagePreview(null);
+                setImageFile(null);
+                // Reset form
+                setNewListing({
+                    name: '',
+                    category: 'Vegetables',
+                    price: '',
+                    unit: 'kg',
+                    quantity: '',
+                    location: '',
+                    state: 'Punjab',
+                    phone: '',
+                    description: '',
+                    negotiable: true,
+                    image: null
+                });
+                alert('Listing verified and published!');
+            } else {
+                alert('Failed to publish listing. check login');
+            }
+        } catch (error) {
+            console.error('Failed to create listing:', error);
+            alert('Failed to publish listing.');
+        }
+    };
+
+    // Handle call button
+    const handleCall = (phone) => {
+        window.location.href = `tel:${phone}`;
+    };
+
+    // Handle message button
+    const handleMessage = (phone) => {
+        // Try WhatsApp first, fallback to SMS
+        const message = encodeURIComponent('Hi, I am interested in your listing on FarmConnect.');
+        window.location.href = `https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${message}`;
     };
 
     const filteredListings = produceListings.filter(item => {
@@ -222,17 +149,43 @@ const BuySellPage = () => {
                 </button>
             </div>
 
-            {/* Search Bar */}
+            {/* Search Bar with Autocomplete */}
             <div className="mb-6">
                 <div className="relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                     <input
                         type="text"
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => {
+                            setSearchQuery(e.target.value);
+                            setShowSearchSuggestions(e.target.value.length >= 2);
+                        }}
+                        onFocus={() => setShowSearchSuggestions(searchQuery.length >= 2)}
+                        onBlur={() => setTimeout(() => setShowSearchSuggestions(false), 200)}
                         placeholder="Search by crop, location, or seller..."
                         className="w-full pl-12 pr-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-nature-500 focus:border-transparent transition-all"
                     />
+
+                    {/* Search Suggestions Dropdown */}
+                    {showSearchSuggestions && searchSuggestions.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-60 overflow-y-auto">
+                            {searchSuggestions.map((suggestion, index) => (
+                                <button
+                                    key={index}
+                                    onClick={() => {
+                                        setSearchQuery(suggestion);
+                                        setShowSearchSuggestions(false);
+                                    }}
+                                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <Search className="h-4 w-4 text-gray-400" />
+                                        <span className="text-gray-900">{suggestion}</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -348,11 +301,17 @@ const BuySellPage = () => {
                                                 <span className="text-xs bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full">{item.category}</span>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <button className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
+                                                <button
+                                                    onClick={() => handleCall(item.phone)}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+                                                >
                                                     <Phone className="h-4 w-4" />
                                                     Call
                                                 </button>
-                                                <button className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+                                                <button
+                                                    onClick={() => handleMessage(item.phone)}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                                                >
                                                     <MessageCircle className="h-4 w-4" />
                                                     Message
                                                 </button>
@@ -565,6 +524,38 @@ const BuySellPage = () => {
                                     rows={4}
                                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-nature-500 resize-none"
                                 />
+                            </div>
+
+                            {/* Image Upload */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Product Image</label>
+                                <div className="flex items-center gap-4">
+                                    <label className="flex-1 flex flex-col items-center justify-center px-4 py-6 bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
+                                        <Upload className="h-8 w-8 text-gray-400 mb-2" />
+                                        <span className="text-sm text-gray-600">Click to upload image</span>
+                                        <span className="text-xs text-gray-400 mt-1">PNG, JPG up to 5MB</span>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageUpload}
+                                            className="hidden"
+                                        />
+                                    </label>
+                                    {imagePreview && (
+                                        <div className="relative w-32 h-32 rounded-lg overflow-hidden border-2 border-nature-500">
+                                            <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
+                                            <button
+                                                onClick={() => {
+                                                    setImagePreview(null);
+                                                    setNewListing({ ...newListing, image: null });
+                                                }}
+                                                className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
 
                             {/* Negotiable */}

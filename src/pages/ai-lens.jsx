@@ -11,11 +11,25 @@ const AILensPage = () => {
     const [scanHistory, setScanHistory] = useState([]);
     const fileInputRef = useRef(null);
     const cameraInputRef = useRef(null);
+    const [offlineDataManager, setOfflineDataManager] = useState(null);
 
-    const handleLoadModel = () => {
+    useEffect(() => {
+        const initDB = async () => {
+            const manager = (await import('../lib/offline-data-manager')).default;
+            setOfflineDataManager(manager);
+            const isCached = await manager.checkAiModel('plant_vision');
+            if (isCached) setAiModelLoaded(true);
+        };
+        initDB();
+    }, []);
+
+    const handleLoadModel = async () => {
         setIsLoading(true);
         // Simulate AI model loading
-        setTimeout(() => {
+        setTimeout(async () => {
+            if (offlineDataManager) {
+                await offlineDataManager.saveAiModel('plant_vision', { modelName: 'PlantVision-v1' });
+            }
             setAiModelLoaded(true);
             setIsLoading(false);
         }, 2000);
@@ -45,172 +59,58 @@ const AILensPage = () => {
         }
     };
 
-    const analyzeImage = (imageData, fileName) => {
+    const analyzeImage = async (imageData, fileName) => {
         setIsLoading(true);
 
-        // Simulate AI analysis with multiple detection types
-        setTimeout(() => {
-            // Randomly select detection type for demo
-            const detectionTypes = ['disease', 'pest', 'weed', 'crop'];
-            const randomType = detectionTypes[Math.floor(Math.random() * detectionTypes.length)];
+        try {
+            // Remove data:image/jpeg;base64, prefix if present for API
+            const base64Data = imageData.split(',')[1];
 
-            let mockResults = [];
+            const response = await fetch('http://localhost:3000/api/ai/analyze-image', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ imageBase64: base64Data })
+            });
 
-            if (randomType === 'disease') {
-                mockResults = [
-                    {
-                        type: 'Disease',
-                        name: 'Early Blight',
-                        confidence: 92,
-                        severity: 'Moderate',
-                        description: 'Fungal disease affecting tomato plants, characterized by dark spots with concentric rings on leaves.',
-                        treatment: [
-                            'Remove affected leaves immediately',
-                            'Apply copper-based fungicide (2g/liter water)',
-                            'Ensure proper spacing for air circulation',
-                            'Water at the base to keep foliage dry'
-                        ],
-                        prevention: [
-                            'Rotate crops annually',
-                            'Use disease-resistant varieties',
-                            'Mulch around plants to prevent soil splash',
-                            'Avoid overhead watering'
-                        ]
-                    },
-                    {
-                        type: 'Disease',
-                        name: 'Leaf Spot',
-                        confidence: 78,
-                        severity: 'Low',
-                        description: 'Bacterial infection causing small brown spots on leaves.',
-                        treatment: [
-                            'Prune infected areas',
-                            'Apply neem oil spray (5ml/liter)',
-                            'Improve drainage'
-                        ],
-                        prevention: [
-                            'Maintain plant hygiene',
-                            'Avoid wetting leaves during watering'
-                        ]
-                    }
-                ];
-            } else if (randomType === 'pest') {
-                mockResults = [
-                    {
-                        type: 'Pest',
-                        name: 'Aphids',
-                        confidence: 95,
-                        severity: 'High',
-                        description: 'Small sap-sucking insects that cluster on new growth and undersides of leaves, causing yellowing and stunted growth.',
-                        treatment: [
-                            'Spray with strong water jet to dislodge aphids',
-                            'Apply neem oil solution (5ml/liter water)',
-                            'Use insecticidal soap spray',
-                            'Introduce natural predators like ladybugs'
-                        ],
-                        prevention: [
-                            'Plant companion plants (marigolds, garlic)',
-                            'Regular monitoring of plants',
-                            'Maintain plant health with proper nutrition',
-                            'Remove weeds that harbor aphids'
-                        ]
-                    },
-                    {
-                        type: 'Pest',
-                        name: 'Whiteflies',
-                        confidence: 82,
-                        severity: 'Moderate',
-                        description: 'Tiny white flying insects that feed on plant sap and excrete honeydew, leading to sooty mold.',
-                        treatment: [
-                            'Use yellow sticky traps',
-                            'Apply neem oil or insecticidal soap',
-                            'Remove heavily infested leaves',
-                            'Use reflective mulches'
-                        ],
-                        prevention: [
-                            'Check new plants before introducing',
-                            'Use row covers for young plants',
-                            'Encourage beneficial insects'
-                        ]
-                    }
-                ];
-            } else if (randomType === 'weed') {
-                mockResults = [
-                    {
-                        type: 'Weed',
-                        name: 'Crabgrass',
-                        confidence: 89,
-                        severity: 'Moderate',
-                        description: 'Annual grass weed that spreads rapidly, competing with crops for nutrients, water, and sunlight.',
-                        treatment: [
-                            'Hand-pull young plants before seed formation',
-                            'Apply pre-emergent herbicide in early spring',
-                            'Use post-emergent herbicide for established weeds',
-                            'Mulch heavily to suppress growth'
-                        ],
-                        prevention: [
-                            'Maintain dense crop canopy',
-                            'Proper irrigation to favor crops over weeds',
-                            'Regular field monitoring',
-                            'Crop rotation'
-                        ]
-                    },
-                    {
-                        type: 'Weed',
-                        name: 'Pigweed',
-                        confidence: 85,
-                        severity: 'High',
-                        description: 'Fast-growing broadleaf weed that can produce thousands of seeds, highly competitive with crops.',
-                        treatment: [
-                            'Remove before flowering and seed production',
-                            'Apply selective herbicide',
-                            'Cultivate soil to disrupt weed growth',
-                            'Use cover crops to suppress'
-                        ],
-                        prevention: [
-                            'Clean equipment between fields',
-                            'Use weed-free seeds',
-                            'Timely cultivation',
-                            'Maintain soil fertility for crop competitiveness'
-                        ]
-                    }
-                ];
-            } else { // crop identification
-                mockResults = [
-                    {
-                        type: 'Crop',
-                        name: 'Wheat (Triticum aestivum)',
-                        confidence: 94,
-                        severity: null,
-                        description: 'Healthy wheat crop at vegetative growth stage. Plants show good vigor with dark green leaves.',
-                        treatment: [
-                            'Current growth stage: Tillering',
-                            'Recommended: Apply nitrogen fertilizer (30 kg/ha)',
-                            'Monitor for rust diseases',
-                            'Ensure adequate soil moisture'
-                        ],
-                        prevention: [
-                            'Optimal planting time: October-November',
-                            'Seed rate: 100 kg/ha',
-                            'Row spacing: 20-22 cm',
-                            'Expected harvest: March-April'
-                        ]
-                    }
-                ];
-            }
+            if (!response.ok) throw new Error('Analysis failed');
+
+            const analysis = await response.json();
+
+            // Transform API response to match UI structure if needed, 
+            // but the server instructions asked for matching JSON.
+            // We'll wrap it in our internal result structure.
+
+            // The prompt asks for specific fields, let's map them to be safe
+            // Expected from API: { crop_name, disease_name, confidence, treatment, prevention }
+            // Mapped to UI: detections array
+
+            const detections = [{
+                type: analysis['Disease/Pest'] ? (analysis['Disease/Pest'] === 'None' ? 'Crop' : 'Disease') : 'Crop',
+                name: analysis['Disease/Pest'] === 'None' ? analysis['Crop Name'] : analysis['Disease/Pest'],
+                confidence: parseInt(analysis['Confidence Level']) || 85,
+                severity: 'Moderate', // API might not give this, default to moderate
+                description: `Identified as ${analysis['Crop Name']}. ${analysis['Disease/Pest'] !== 'None' ? `Affected by ${analysis['Disease/Pest']}.` : 'Plant appears healthy.'}`,
+                treatment: Array.isArray(analysis['Treatment']) ? analysis['Treatment'] : [analysis['Treatment']],
+                prevention: Array.isArray(analysis['Prevention']) ? analysis['Prevention'] : [analysis['Prevention']]
+            }];
 
             const result = {
                 id: Date.now(),
                 fileName,
                 imageData,
                 timestamp: new Date().toLocaleString(),
-                detections: mockResults
+                detections
             };
 
             setAnalysisResult(result);
             setScanHistory(prev => [result, ...prev]);
+
+        } catch (error) {
+            console.error(error);
+            alert('Failed to analyze image. Please try again.');
+        } finally {
             setIsLoading(false);
-        }, 3000);
+        }
     };
 
     const clearAnalysis = () => {

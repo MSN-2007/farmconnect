@@ -2,10 +2,15 @@ import React, { useState } from 'react';
 import { Plus, X, TrendingUp, TrendingDown, DollarSign, Wheat, Upload, FileText, Sparkles, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 
+import { smartFetch } from '../lib/api-config';
+import { useAuth } from '../context/auth-context'; // Import Auth
+
 const AnalyticsPage = () => {
+    const { user } = useAuth(); // Get auth user
     const [activeTab, setActiveTab] = useState('Income');
     const [showAddMetricModal, setShowAddMetricModal] = useState(false);
     const [metrics, setMetrics] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [reportAnalysis, setReportAnalysis] = useState(null);
     const [uploadedFile, setUploadedFile] = useState(null);
 
@@ -19,6 +24,24 @@ const AnalyticsPage = () => {
         expenses: ''
     });
 
+    // Fetch Metrics on Load
+    useEffect(() => {
+        const fetchMetrics = async () => {
+            if (!user) return; // Wait for auth
+            try {
+                const data = await smartFetch('analytics');
+                if (Array.isArray(data)) {
+                    setMetrics(data);
+                }
+            } catch (error) {
+                console.error("Failed to load metrics", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchMetrics();
+    }, [user]);
+
     // Calculate totals
     const totalIncome = metrics.reduce((sum, m) => sum + (parseFloat(m.income) || 0), 0);
     const totalExpenses = metrics.reduce((sum, m) => sum + (parseFloat(m.expenses) || 0), 0);
@@ -30,27 +53,35 @@ const AnalyticsPage = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleAddMetric = (e) => {
+    const handleAddMetric = async (e) => {
         e.preventDefault();
-        const newMetric = {
-            id: Date.now(),
-            ...formData,
-            income: parseFloat(formData.income) || 0,
-            expenses: parseFloat(formData.expenses) || 0,
-            yieldAmount: parseFloat(formData.yieldAmount) || 0,
-            areaPlanted: parseFloat(formData.areaPlanted) || 0
-        };
+        try {
+            const newMetricPayload = {
+                ...formData,
+                income: parseFloat(formData.income) || 0,
+                expenses: parseFloat(formData.expenses) || 0,
+                yieldAmount: parseFloat(formData.yieldAmount) || 0,
+                areaPlanted: parseFloat(formData.areaPlanted) || 0
+            };
 
-        setMetrics(prev => [...prev, newMetric]);
-        setFormData({
-            date: new Date().toISOString().split('T')[0],
-            cropType: '',
-            areaPlanted: '',
-            yieldAmount: '',
-            income: '',
-            expenses: ''
-        });
-        setShowAddMetricModal(false);
+            // Save to Backend
+            const savedMetric = await smartFetch('analytics', newMetricPayload, 'POST');
+
+            if (savedMetric) {
+                setMetrics(prev => [...prev, savedMetric]);
+                setFormData({
+                    date: new Date().toISOString().split('T')[0],
+                    cropType: '',
+                    areaPlanted: '',
+                    yieldAmount: '',
+                    income: '',
+                    expenses: ''
+                });
+                setShowAddMetricModal(false);
+            }
+        } catch (error) {
+            alert("Failed to save metric. Please try again.");
+        }
     };
 
     // Handle report upload and analysis

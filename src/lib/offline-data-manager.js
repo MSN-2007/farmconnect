@@ -61,12 +61,18 @@ class OfflineDataManager {
                     packStore.createIndex('type', 'type', { unique: false });
                     packStore.createIndex('version', 'version', { unique: false });
                 }
+
+                // AI Models store
+                if (!db.objectStoreNames.contains('aiModels')) {
+                    db.createObjectStore('aiModels', { keyPath: 'id' });
+                }
             };
         });
     }
 
     // Save weather data for offline use
     async saveWeatherData(weatherData) {
+        if (!this.db) await this.init();
         const transaction = this.db.transaction(['weather'], 'readwrite');
         const store = transaction.objectStore('weather');
 
@@ -83,6 +89,7 @@ class OfflineDataManager {
 
     // Get cached weather data
     async getWeatherData(location, days = 15) {
+        if (!this.db) await this.init();
         const transaction = this.db.transaction(['weather'], 'readonly');
         const store = transaction.objectStore('weather');
         const index = store.index('location');
@@ -93,6 +100,7 @@ class OfflineDataManager {
 
     // Save pest & disease database
     async savePestDatabase(pestData) {
+        if (!this.db) await this.init();
         const transaction = this.db.transaction(['pestDatabase'], 'readwrite');
         const store = transaction.objectStore('pestDatabase');
 
@@ -109,6 +117,7 @@ class OfflineDataManager {
 
     // Get pest/disease info offline
     async getPestInfo(name) {
+        if (!this.db) await this.init();
         const transaction = this.db.transaction(['pestDatabase'], 'readonly');
         const store = transaction.objectStore('pestDatabase');
         const index = store.index('name');
@@ -127,6 +136,7 @@ class OfflineDataManager {
 
     // Save crop varieties
     async saveCropVarieties(varieties) {
+        if (!this.db) await this.init();
         const transaction = this.db.transaction(['cropVarieties'], 'readwrite');
         const store = transaction.objectStore('cropVarieties');
 
@@ -152,6 +162,7 @@ class OfflineDataManager {
 
     // Save market prices
     async saveMarketPrices(prices) {
+        if (!this.db) await this.init();
         const transaction = this.db.transaction(['marketPrices'], 'readwrite');
         const store = transaction.objectStore('marketPrices');
 
@@ -233,6 +244,7 @@ class OfflineDataManager {
 
     // Check if pack needs update
     async checkPackVersion(packType, currentVersion) {
+        if (!this.db) await this.init();
         const transaction = this.db.transaction(['downloadPacks'], 'readonly');
         const store = transaction.objectStore('downloadPacks');
 
@@ -240,6 +252,30 @@ class OfflineDataManager {
         if (!pack) return true; // Need to download
 
         return pack.version < currentVersion; // Need update
+    }
+
+    // AI Model storage
+    async saveAiModel(modelId, modelData) {
+        if (!this.db) await this.init();
+        const transaction = this.db.transaction(['aiModels'], 'readwrite');
+        const store = transaction.objectStore('aiModels');
+
+        await store.put({
+            id: modelId,
+            ...modelData,
+            savedAt: new Date().toISOString()
+        });
+
+        return transaction.complete;
+    }
+
+    async checkAiModel(modelId) {
+        if (!this.db) await this.init();
+        const transaction = this.db.transaction(['aiModels'], 'readonly');
+        const store = transaction.objectStore('aiModels');
+
+        const model = await store.get(modelId);
+        return !!model;
     }
 
     // Get storage usage

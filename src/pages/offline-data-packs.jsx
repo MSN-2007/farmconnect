@@ -56,6 +56,16 @@ const OfflineDataPacks = () => {
             downloaded: false,
             downloading: false,
             icon: '💡'
+        },
+        {
+            id: 'ai_model',
+            name: 'AI Vision Model',
+            description: 'Offline plant & pest recognition model',
+            size: '22 MB',
+            version: 1,
+            downloaded: false,
+            downloading: false,
+            icon: '🧠'
         }
     ]);
 
@@ -131,6 +141,12 @@ const OfflineDataPacks = () => {
                 data: generateMarketPrices()
             };
             await offlineDataManager.saveMarketPrices(packData.data);
+        } else if (packId === 'ai_model') {
+            packData = {
+                version: 1,
+                data: { modelName: 'PlantVision-v1', type: 'tflite', size: '22MB' }
+            };
+            await offlineDataManager.saveAiModel('plant_vision', packData.data);
         }
 
         // Save pack metadata

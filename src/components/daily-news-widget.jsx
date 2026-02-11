@@ -1,8 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Newspaper, TrendingUp, Sprout, AlertTriangle, Award } from 'lucide-react';
+import { smartFetch } from '../lib/api-config';
 
 const DailyNewsWidget = () => {
-    const news = [
+    const [newsList, setNewsList] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    const defaultNews = [
         {
             id: 1,
             category: 'Market',
@@ -29,35 +33,43 @@ const DailyNewsWidget = () => {
             description: 'IMD issues orange alert for Maharashtra and Karnataka. Farmers advised to postpone harvesting activities.',
             time: '6 hours ago',
             color: 'amber'
-        },
-        {
-            id: 4,
-            category: 'Technology',
-            icon: Award,
-            title: 'Drone Subsidy Program Extended Until March',
-            description: 'Ministry of Agriculture extends drone subsidy scheme. Farmers can now get up to 75% subsidy on agricultural drones.',
-            time: '1 day ago',
-            color: 'purple'
-        },
-        {
-            id: 5,
-            category: 'Market',
-            icon: TrendingUp,
-            title: 'Cotton Export Demand Increases',
-            description: 'International buyers show strong interest in Indian cotton. Prices expected to remain stable at ₹7,200/quintal.',
-            time: '1 day ago',
-            color: 'green'
-        },
-        {
-            id: 6,
-            category: 'Agriculture',
-            icon: Sprout,
-            title: 'Free Soil Testing Camps This Weekend',
-            description: 'Agriculture department organizing free soil testing camps in 50+ districts. Register online or visit nearest Krishi Vigyan Kendra.',
-            time: '2 days ago',
-            color: 'blue'
         }
     ];
+
+    useEffect(() => {
+        const fetchNews = async () => {
+            try {
+                const data = await smartFetch('news', {
+                    q: 'agriculture india',
+                    pageSize: 5,
+                    language: 'en',
+                    sortBy: 'publishedAt'
+                });
+
+                if (data && data.articles) {
+                    const formatted = data.articles.map((art, idx) => ({
+                        id: idx,
+                        category: idx % 2 === 0 ? 'Agriculture' : 'Market',
+                        icon: idx % 2 === 0 ? Sprout : TrendingUp,
+                        title: art.title,
+                        description: art.description,
+                        time: new Date(art.publishedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                        color: idx % 2 === 0 ? 'blue' : 'green'
+                    }));
+                    setNewsList(formatted);
+                } else {
+                    setNewsList(defaultNews);
+                }
+            } catch (e) {
+                setNewsList(defaultNews);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchNews();
+    }, []);
+
+    const news = newsList;
 
     const getColorClasses = (color) => {
         const colors = {

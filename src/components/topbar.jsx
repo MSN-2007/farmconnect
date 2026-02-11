@@ -2,9 +2,19 @@ import React, { useState } from 'react';
 import { Search, Bell, User, ChevronDown, MessageSquare, HelpCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 
+import { useAuth } from '../context/auth-context';
+import { useNavigate } from 'react-router-dom';
+
 const Topbar = () => {
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
     const [showNotifications, setShowNotifications] = useState(false);
     const [showProfile, setShowProfile] = useState(false);
+
+    const handleLogout = () => {
+        logout();
+        navigate('/login');
+    };
 
     const notifications = [
         { id: 1, type: 'price', message: 'Wheat prices increased by 5%', time: '2h ago', unread: true },
@@ -112,57 +122,71 @@ const Topbar = () => {
 
                 {/* Profile */}
                 <div className="relative">
-                    <button
-                        onClick={() => setShowProfile(!showProfile)}
-                        className="flex items-center gap-3 pl-3 pr-2 py-2 hover:bg-gray-100 rounded-lg transition-colors"
-                    >
-                        <div className="h-8 w-8 bg-gradient-to-br from-nature-600 to-green-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                            JD
-                        </div>
-                        <div className="text-left hidden md:block">
-                            <div className="text-sm font-semibold text-gray-900">John Doe</div>
-                            <div className="text-xs text-gray-500">Farmer</div>
-                        </div>
-                        <ChevronDown className="h-4 w-4 text-gray-600" />
-                    </button>
-
-                    {/* Profile Dropdown */}
-                    {showProfile && (
+                    {user ? (
                         <>
-                            <div
-                                className="fixed inset-0 z-40"
-                                onClick={() => setShowProfile(false)}
-                            />
-                            <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
-                                <div className="p-4 border-b border-gray-200">
-                                    <div className="flex items-center gap-3">
-                                        <div className="h-12 w-12 bg-gradient-to-br from-nature-600 to-green-600 rounded-full flex items-center justify-center text-white font-semibold">
-                                            JD
+                            <button
+                                onClick={() => setShowProfile(!showProfile)}
+                                className="flex items-center gap-3 pl-3 pr-2 py-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            >
+                                <div className="h-8 w-8 bg-gradient-to-br from-nature-600 to-green-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                                    {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                                </div>
+                                <div className="text-left hidden md:block">
+                                    <div className="text-sm font-semibold text-gray-900">{user.name}</div>
+                                    <div className="text-xs text-gray-500 capitalize">{user.role}</div>
+                                </div>
+                                <ChevronDown className="h-4 w-4 text-gray-600" />
+                            </button>
+
+                            {/* Profile Dropdown */}
+                            {showProfile && (
+                                <>
+                                    <div
+                                        className="fixed inset-0 z-40"
+                                        onClick={() => setShowProfile(false)}
+                                    />
+                                    <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl shadow-xl border border-gray-200 z-50">
+                                        <div className="p-4 border-b border-gray-200">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-12 w-12 bg-gradient-to-br from-nature-600 to-green-600 rounded-full flex items-center justify-center text-white font-semibold">
+                                                    {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                                                </div>
+                                                <div>
+                                                    <div className="font-semibold text-gray-900">{user.name}</div>
+                                                    <div className="text-sm text-gray-500">{user.phone || 'No phone'}</div>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <div className="font-semibold text-gray-900">John Doe</div>
-                                            <div className="text-sm text-gray-500">john@farmconnect.com</div>
+                                        <div className="p-2">
+                                            <button className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                                                My Profile
+                                            </button>
+                                            <button className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                                                My Listings
+                                            </button>
+                                            <button className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                                                Settings
+                                            </button>
+                                        </div>
+                                        <div className="p-2 border-t border-gray-200">
+                                            <button
+                                                onClick={handleLogout}
+                                                className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium"
+                                            >
+                                                Logout
+                                            </button>
                                         </div>
                                     </div>
-                                </div>
-                                <div className="p-2">
-                                    <button className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-                                        My Profile
-                                    </button>
-                                    <button className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-                                        My Listings
-                                    </button>
-                                    <button className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-                                        Settings
-                                    </button>
-                                </div>
-                                <div className="p-2 border-t border-gray-200">
-                                    <button className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium">
-                                        Logout
-                                    </button>
-                                </div>
-                            </div>
+                                </>
+                            )}
                         </>
+                    ) : (
+                        <button
+                            onClick={() => navigate('/login')}
+                            className="px-4 py-2 bg-nature-600 text-white rounded-lg font-medium hover:bg-nature-700 transition-colors"
+                        >
+                            Login
+                        </button>
                     )}
                 </div>
             </div>
