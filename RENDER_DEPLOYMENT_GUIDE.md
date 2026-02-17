@@ -72,30 +72,29 @@ FRONTEND_URL=https://farmconnect-24o6o703i-smashs-projects-cf900e59.vercel.app
 3. You'll see build logs in real-time
 4. When done, you'll get a URL like: `https://farmconnect-backend-77k4.onrender.com`
 
-## Step 6: Update Vercel Frontend
+## Step 6: Deploy Frontend (Cloudflare Pages Recommended)
 
-Once backend is deployed, you need to connect frontend to it:
+Due to Vercel auto-detection issues, we recommend **Cloudflare Pages** for the fastest and most stable frontend deployment.
 
-### 6.1 Update Vercel Environment Variables
+### 6.1 Setup Cloudflare Pages
+1.  Go to [dash.cloudflare.com](https://dash.cloudflare.com)
+2.  **Workers & Pages** → **Create application** → **Pages** → **Connect to Git**
+3.  Choose your repository: `MSN-2007/farmconnect`
+4.  Apply these **Build Settings**:
+    - **Framework preset**: `Vite`
+    - **Build command**: `npm run build`
+    - **Build output directory**: `dist`
+5.  **Environment Variables**:
+    - Add Variable: `VITE_API_URL`
+    - Value: `https://farmconnect-backend-77k4.onrender.com`
+6.  Click **Save and Deploy**
 
-1. Go to **Vercel Dashboard**
-2. Select your **farmconnect** project
-3. Go to **Settings** → **Environment Variables**
-4. Add/Update:
-   ```
-   VITE_API_URL=https://farmconnect-backend-77k4.onrender.com
-   ```
-5. Click **Save**
-
-### 6.2 Redeploy Frontend
-
-Go to **Deployments** tab → Click **"Redeploy"** on latest deployment
-
-OR push a small change:
-```bash
-git commit --allow-empty -m "Update backend URL"
-git push
-```
+### 6.2 Existing Vercel (Alternative)
+If you prefer to stay on Vercel, update your project settings:
+1.  **Framework Preset**: Select `Vite`
+2.  **Output Directory**: Override to `dist`
+3.  Ensure `VITE_API_URL` is set to your Render URL.
+4.  Redeploy.
 
 ## Step 7: Test Everything
 
