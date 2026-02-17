@@ -60,7 +60,7 @@ NEWS_API_KEY_1=api_live_5XIhYMURQO0LJfdplNHmV2NxrWEVY3Pn9LG8LEHCr9na92v3qczWq
 NEWS_API_KEY_2=api_live_J5YSkQljJqm60rZvMvZhKdp7rSVc4fOfc4T4EiQy
 NEWS_API_KEY_3=api_live_6UBOL6O2FD9ZQXk5GokxpMT5z7KZXBmXvoxaV9uq8XMrcf380SclmpS2rg
 NEWS_API_KEY_4=335520ed34e54e47858f15693f9634ab
-FRONTEND_URL=https://farmconnect-wine.vercel.app
+FRONTEND_URL=https://farmconnect-24o6o703i-smashs-projects-cf900e59.vercel.app
 ```
 
 **IMPORTANT**: Update `FRONTEND_URL` with your actual Vercel URL!
