@@ -60,7 +60,7 @@ NEWS_API_KEY_1=api_live_5XIhYMURQO0LJfdplNHmV2NxrWEVY3Pn9LG8LEHCr9na92v3qczWq
 NEWS_API_KEY_2=api_live_J5YSkQljJqm60rZvMvZhKdp7rSVc4fOfc4T4EiQy
 NEWS_API_KEY_3=api_live_6UBOL6O2FD9ZQXk5GokxpMT5z7KZXBmXvoxaV9uq8XMrcf380SclmpS2rg
 NEWS_API_KEY_4=335520ed34e54e47858f15693f9634ab
-FRONTEND_URL=https://farmconnect-f4jz2amu0-smashs-projects-cf900e59.vercel.app
+FRONTEND_URL=https://farmconnect-wine.vercel.app
 ```
 
 **IMPORTANT**: Update `FRONTEND_URL` with your actual Vercel URL!
@@ -70,7 +70,7 @@ FRONTEND_URL=https://farmconnect-f4jz2amu0-smashs-projects-cf900e59.vercel.app
 1. Click **"Create Web Service"**
 2. Wait 2-5 minutes for deployment
 3. You'll see build logs in real-time
-4. When done, you'll get a URL like: `https://farmconnect-backend.onrender.com`
+4. When done, you'll get a URL like: `https://farmconnect-backend-77k4.onrender.com`
 
 ## Step 6: Update Vercel Frontend
 
@@ -83,7 +83,7 @@ Once backend is deployed, you need to connect frontend to it:
 3. Go to **Settings** → **Environment Variables**
 4. Add/Update:
    ```
-   VITE_API_URL=https://farmconnect-backend.onrender.com
+   VITE_API_URL=https://farmconnect-backend-77k4.onrender.com
    ```
 5. Click **Save**
 
@@ -100,7 +100,7 @@ git push
 ## Step 7: Test Everything
 
 ### Test Backend Directly
-Visit: `https://farmconnect-backend.onrender.com/api/csrf-token`
+Visit: `https://farmconnect-backend-77k4.onrender.com/api/csrf-token`
 
 Should return:
 ```json
@@ -131,7 +131,7 @@ Your app is now fully deployed:
 ### Keep Backend Awake (Optional)
 Use a service like **UptimeRobot** to ping your backend every 10 minutes:
 1. Sign up at uptimerobot.com
-2. Add monitor: `https://farmconnect-backend.onrender.com/api/csrf-token`
+2. Add monitor: `https://farmconnect-backend-77k4.onrender.com/api/csrf-token`
 3. Check interval: 10 minutes
 
 ## 🐛 Troubleshooting
