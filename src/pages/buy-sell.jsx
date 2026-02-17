@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, MapPin, Phone, MessageCircle, Plus, TrendingUp, TrendingDown, X, Upload, Image as ImageIcon, Sparkles, Heart, SlidersHorizontal, Star } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/auth-context';
@@ -46,6 +46,7 @@ const BuySellPage = () => {
     });
     const [imageFile, setImageFile] = useState(null); // Separate state for File object
     const [additionalImages, setAdditionalImages] = useState([]); // Store multiple images
+    const [produceListings, setProduceListings] = useState([]); // Marketplace listings
 
     // ... (categories arrays remain same) ...
 
@@ -77,7 +78,7 @@ const BuySellPage = () => {
     };
 
     // Fetch user location on mount
-    React.useEffect(() => {
+    useEffect(() => {
         getUserLocation()
             .then(loc => setUserLocation(loc))
             .catch(() => { }); // Silent fail if location not available

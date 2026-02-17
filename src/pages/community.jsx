@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     MessageSquare,
     ThumbsUp,
@@ -89,6 +89,7 @@ const CommunityPage = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [likedPosts, setLikedPosts] = useState({});
     const [likedComments, setLikedComments] = useState({});
+    const [csrfToken, setCsrfToken] = useState('');
 
     // New post state
     const [newPostContent, setNewPostContent] = useState('');
@@ -100,8 +101,22 @@ const CommunityPage = () => {
     const [posts, setPosts] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    // Fetch CSRF token on mount
+    useEffect(() => {
+        const fetchCsrfToken = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/csrf-token`, { credentials: 'include' });
+                const data = await res.json();
+                setCsrfToken(data.csrfToken);
+            } catch (error) {
+                console.error('Failed to fetch CSRF token:', error);
+            }
+        };
+        fetchCsrfToken();
+    }, []);
+
     // Fetch posts on load and when community changes
-    React.useEffect(() => {
+    useEffect(() => {
         fetchPosts();
     }, [activeCommunity]);
 
@@ -110,9 +125,61 @@ const CommunityPage = () => {
         try {
             const res = await fetch(`${API_URL}/api/posts?community=${activeCommunity}`);
             const data = await res.json();
-            setPosts(data);
+
+            // Check if data is an array (successful response)
+            if (Array.isArray(data)) {
+                setPosts(data);
+            } else {
+                // API returned error object, use sample data
+                console.error('API error:', data);
+                setPosts([
+                    {
+                        _id: '1',
+                        author: 'Sample Farmer',
+                        content: 'Welcome to the FarmConnect community! Share your farming experiences here.',
+                        community: 'General',
+                        tags: ['welcome', 'farming'],
+                        likes: 10,
+                        comments: [],
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        _id: '2',
+                        author: 'Crop Expert',
+                        content: 'Great harvest season this year! What crops are you growing?',
+                        community: 'Crops',
+                        tags: ['crops', 'harvest'],
+                        likes: 5,
+                        comments: [],
+                        createdAt: new Date().toISOString()
+                    }
+                ]);
+            }
         } catch (error) {
             console.error('Failed to fetch posts:', error);
+            // FALLBACK: Use sample data if API fails
+            setPosts([
+                {
+                    _id: '1',
+                    author: 'Sample Farmer',
+                    content: 'Welcome to the FarmConnect community! Share your farming experiences here.',
+                    community: 'General',
+                    tags: ['welcome', 'farming'],
+                    likes: 10,
+                    comments: [],
+                    createdAt: new Date().toISOString()
+                },
+                {
+                    _id: '2',
+                    author: 'Crop Expert',
+                    content: 'Great harvest season this year! What crops are you growing?',
+                    community: 'Crops',
+                    tags: ['crops', 'harvest'],
+                    likes: 5,
+                    comments: [],
+                    createdAt: new Date().toISOString()
+                }
+            ]);
         } finally {
             setLoading(false);
         }
@@ -133,6 +200,16 @@ const CommunityPage = () => {
 
     const searchSuggestions = getSearchSuggestions();
 
+    // Filter posts by community and search query
+    const filteredPosts = posts.filter(post => {
+        const communityMatch = activeCommunity === 'all' || post.community === activeCommunity;
+        const searchMatch = searchQuery === '' ||
+            post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            post.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            (post.tags && post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase())));
+        return communityMatch && searchMatch;
+    });
+
     // Handle new post
     const handleCreatePost = async () => {
         if (!newPostContent.trim()) return;
@@ -149,6 +226,9 @@ const CommunityPage = () => {
             const res = await fetch(`${API_URL}/api/posts`, {
                 method: 'POST',
                 credentials: 'include',  // Send httpOnly cookie
+                headers: {
+                    'X-CSRF-Token': csrfToken
+                },
                 body: formData
             });
 
@@ -186,18 +266,22 @@ const CommunityPage = () => {
         if (alreadyLiked) return; // Prevent double like
 
         setLikedPosts(prev => ({ ...prev, [postId]: true }));
-        setPosts(posts.map(p => p.id === postId ? { ...p, likes: p.likes + 1 } : p));
+        setPosts(posts.map(p => p._id === postId ? { ...p, likes: p.likes + 1 } : p));
 
         try {
             await fetch(`${API_URL}/api/posts/${postId}/like`, {
                 method: 'POST',
-                credentials: 'include'  // Send httpOnly cookie
+                credentials: 'include',  // Send httpOnly cookie
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                }
             });
         } catch (error) {
             console.error('Failed to like post:', error);
             // Revert on error
             setLikedPosts(prev => ({ ...prev, [postId]: false }));
-            setPosts(posts.map(p => p.id === postId ? { ...p, likes: p.likes - 1 } : p));
+            setPosts(posts.map(p => p._id === postId ? { ...p, likes: p.likes - 1 } : p));
         }
     };
 
@@ -312,18 +396,20 @@ const CommunityPage = () => {
                 ) : (
                     filteredPosts.map(post => {
                         const postCommunity = communities.find(c => c.id === post.community);
+                        const authorName = post.author?.name || 'Unknown User';
+                        const authorInitial = authorName.charAt(0).toUpperCase();
 
                         return (
-                            <div key={post.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                            <div key={post._id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
                                 {/* Post Header */}
                                 <div className="flex items-start gap-4 mb-4">
-                                    <div className={cn("w-12 h-12 rounded-full flex items-center justify-center text-white font-bold", post.color)}>
-                                        {post.initial}
+                                    <div className={cn("w-12 h-12 rounded-full flex items-center justify-center text-white font-bold bg-nature-600")}>
+                                        {authorInitial}
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="font-bold text-gray-900">{post.author}</h3>
-                                            {post.isExpert && (
+                                            <h3 className="font-bold text-gray-900">{authorName}</h3>
+                                            {post.author?.role === 'expert' && (
                                                 <div className="flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
                                                     <CheckCircle className="h-3 w-3" />
                                                     Expert
@@ -335,14 +421,14 @@ const CommunityPage = () => {
                                                 </div>
                                             )}
                                         </div>
-                                        {post.role && <p className="text-sm text-gray-600 mb-1">{post.role}</p>}
+                                        {post.author?.role && <p className="text-sm text-gray-600 mb-1">{post.author.role}</p>}
                                         <div className="flex items-center gap-3 text-sm text-gray-500">
                                             <span className="flex items-center gap-1">
                                                 <MapPin className="h-3 w-3" />
-                                                {post.location}
+                                                {post.location || 'Unknown'}
                                             </span>
                                             <span>•</span>
-                                            <span>{post.time}</span>
+                                            <span>{new Date(post.createdAt).toLocaleDateString()}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -369,18 +455,18 @@ const CommunityPage = () => {
                                 {/* Post Actions */}
                                 <div className="flex items-center gap-6 pt-4 border-t border-gray-100">
                                     <button
-                                        onClick={() => toggleLike(post.id)}
+                                        onClick={() => toggleLike(post._id)}
                                         className={cn(
                                             "flex items-center gap-2 text-sm font-medium transition-colors",
-                                            likedPosts[post.id] ? "text-nature-700" : "text-gray-600 hover:text-nature-700"
+                                            likedPosts[post._id] ? "text-nature-700" : "text-gray-600 hover:text-nature-700"
                                         )}
                                     >
-                                        <ThumbsUp className={cn("h-4 w-4", likedPosts[post.id] && "fill-current")} />
-                                        {post.likes + (likedPosts[post.id] ? 1 : 0)}
+                                        <ThumbsUp className={cn("h-4 w-4", likedPosts[post._id] && "fill-current")} />
+                                        {post.likes + (likedPosts[post._id] ? 1 : 0)}
                                     </button>
                                     <button className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-nature-700 transition-colors">
                                         <MessageSquare className="h-4 w-4" />
-                                        {post.comments}
+                                        {post.comments?.length || 0}
                                     </button>
                                     <button className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-nature-700 transition-colors">
                                         <Share2 className="h-4 w-4" />

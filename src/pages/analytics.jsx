@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, X, TrendingUp, TrendingDown, DollarSign, Wheat, Upload, FileText, Sparkles, AlertCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 
