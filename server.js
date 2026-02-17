@@ -41,7 +41,8 @@ const allowedOrigins = process.env.NODE_ENV === 'production'
     ? [
         process.env.FRONTEND_URL,
         /^https:\/\/.*\.vercel\.app$/,  // Allow all Vercel preview deployments
-        /^https:\/\/.*\.onrender\.com$/  // Allow Render backend
+        /^https:\/\/.*\.onrender\.com$/, // Allow Render backend
+        /^https:\/\/.*\.pages\.dev$/     // Allow Cloudflare Pages
     ]
     : ['http://localhost:5173', 'http://localhost:4173', 'http://localhost:5174', 'http://localhost:5175'];
 
