@@ -38,8 +38,12 @@ const httpServer = createServer(app);
 
 // CORS allowed origins (shared between Express and Socket.io)
 const allowedOrigins = process.env.NODE_ENV === 'production'
-    ? [process.env.FRONTEND_URL]
-    : ['http://localhost:5173', 'http://localhost:4173'];
+    ? [
+        process.env.FRONTEND_URL,
+        /^https:\/\/.*\.vercel\.app$/,  // Allow all Vercel preview deployments
+        /^https:\/\/.*\.onrender\.com$/  // Allow Render backend
+    ]
+    : ['http://localhost:5173', 'http://localhost:4173', 'http://localhost:5174', 'http://localhost:5175'];
 
 const io = new Server(httpServer, {
     cors: {
