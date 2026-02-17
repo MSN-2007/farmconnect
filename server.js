@@ -62,6 +62,19 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.includes('CHANGE_THIS')) {
 }
 
 // --- Security Middleware ---
+
+// 🛡️ CRITICAL FIX: Make req.query writable (fixes Express 5+ compatibility with hpp/mongo-sanitize)
+app.use((req, res, next) => {
+    const query = req.query;
+    Object.defineProperty(req, 'query', {
+        value: query,
+        writable: true,
+        enumerable: true,
+        configurable: true
+    });
+    next();
+});
+
 app.use(helmet({
     contentSecurityPolicy: {
         directives: {
