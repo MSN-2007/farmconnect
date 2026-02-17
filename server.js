@@ -133,17 +133,19 @@ app.use(mongoSanitize({
     },
 }));
 
+
 // 🛡️ HTTP Parameter Pollution Protection
 app.use(hpp());
+
+// Provide CSRF token to frontend (MUST be before CSRF protection)
+app.get('/api/csrf-token', (req, res) => {
+    res.json({ csrfToken: req.csrfToken() });
+});
 
 // 🛡️ CSRF Protection (for cookie-based auth)
 const csrfProtection = csrf({ cookie: true });
 app.use(csrfProtection);
 
-// Provide CSRF token to frontend
-app.get('/api/csrf-token', (req, res) => {
-    res.json({ csrfToken: req.csrfToken() });
-});
 
 // --- Configuration ---
 // 1. MongoDB Connection
