@@ -1,33 +1,12 @@
 {
-    "version": 2,
-    "builds": [
-        {
-            "src": "package.json",
-            "use": "@vercel/static-build",
-            "config": {
-                "distDir": "dist"
-            }
-        },
-        {
-            "src": "server.js",
-            "use": "@vercel/node"
-        }
-    ],
     "routes": [
         {
             "src": "/api/(.*)",
-            "dest": "/server.js"
-        },
-        {
-            "src": "/(.*\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|webp|json))",
-            "dest": "/dist/$1"
+            "dest": "https://farmconnect-backend-77k4.onrender.com/api/$1"
         },
         {
             "src": "/(.*)",
-            "dest": "/dist/index.html"
+            "dest": "/index.html"
         }
-    ],
-    "env": {
-        "NODE_ENV": "production"
-    }
+    ]
 }
