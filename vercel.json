@@ -1,12 +1,12 @@
 {
-    "routes": [
+    "rewrites": [
         {
-            "src": "/api/(.*)",
-            "dest": "https://farmconnect-backend-77k4.onrender.com/api/$1"
+            "source": "/api/:path*",
+            "destination": "https://farmconnect-backend-77k4.onrender.com/api/:path*"
         },
         {
-            "src": "/(.*)",
-            "dest": "/index.html"
+            "source": "/((?!api/).*)",
+            "destination": "/index.html"
         }
     ]
 }
