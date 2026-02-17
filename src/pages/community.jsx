@@ -20,9 +20,9 @@ import {
     AlertCircle
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import SearchBarWithAutocomplete from '../components/search-bar-autocomplete';
+import SearchBarWithAutocomplete from '../components/search-bar-autocomplete.jsx';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const CommunityPage = () => {
     // Enhanced categories with icons and descriptions

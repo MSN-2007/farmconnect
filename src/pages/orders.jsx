@@ -3,7 +3,7 @@ import { Package, Clock, MapPin, Phone, CheckCircle, XCircle, Truck, AlertCircle
 import { useAuth } from '../context/auth-context';
 import { cn } from '../lib/utils';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const OrdersPage = () => {
     const { user } = useAuth();

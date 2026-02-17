@@ -6,7 +6,7 @@ import {
     Clock, Check
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import SearchBarWithAutocomplete from '../components/search-bar-autocomplete';
+import SearchBarWithAutocomplete from '../components/search-bar-autocomplete.jsx';
 
 const ShopsPage = () => {
     const [searchQuery, setSearchQuery] = useState('');

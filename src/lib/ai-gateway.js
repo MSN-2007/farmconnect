@@ -8,7 +8,7 @@ export const getAIResponse = async (query, userContext = {}) => {
     console.log("AI Gateway: Querying Secure Backend Proxy...");
 
     try {
-        // Use smartFetch which now routes to localhost:3000/api/ai/generate
+        // Use smartFetch which now routes to localhost:3001/api/ai/generate
         const responseData = await smartFetch('ai', { prompt: query });
 
         if (responseData && responseData.candidates && responseData.candidates[0].content) {

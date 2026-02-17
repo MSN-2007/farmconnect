@@ -3,7 +3,7 @@ import { Heart, X, Phone, MessageCircle, MapPin, TrendingUp, Trash2, Bell, BellO
 import { useAuth } from '../context/auth-context';
 import { cn } from '../lib/utils';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const WishlistPage = () => {
     const { user } = useAuth();

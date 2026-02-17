@@ -8,7 +8,7 @@ const REGIONS = ['APAC', 'EMEA', 'AMER'];
 const CURRENT_REGION = 'APAC'; // Dynamic sharding based on IP in production
 
 // 🔒 Backend Proxy Configuration
-const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const BACKEND_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const API_CONFIG = {
     // 🌤️ Weather APIs - Served via Proxy

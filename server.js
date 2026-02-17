@@ -116,10 +116,10 @@ app.use(express.json({ limit: '10mb' })); // Limit body size to prevent DoS
 app.use(cookieParser()); // Parse cookies for httpOnly JWT
 app.use(compression()); // Compress all responses
 
-// ✅ Security Enhancements - TEMPORARILY DISABLED TO FIX ERRORS
-// app.use(trackRequest); // Track requests for suspicious activity detection
-// app.use(logAuthMiddleware); // Log auth attempts
-// app.use(sanitizeInputs); // Sanitize all inputs to prevent XSS
+// ✅ Security Enhancements - RE-ENABLED FOR PRODUCTION
+app.use(trackRequest); // Track requests for suspicious activity detection
+app.use(logAuthMiddleware); // Log auth attempts
+app.use(sanitizeInputs); // Sanitize all inputs to prevent XSS
 
 // 🛡️ NoSQL Injection Prevention
 app.use(mongoSanitize({

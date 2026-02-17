@@ -4,7 +4,7 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../context/auth-context';
 import { calculateDistance, formatDistance, getUserLocation } from '../lib/distance';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const BuySellPage = () => {
     const { user } = useAuth();
@@ -48,7 +48,49 @@ const BuySellPage = () => {
     const [additionalImages, setAdditionalImages] = useState([]); // Store multiple images
     const [produceListings, setProduceListings] = useState([]); // Marketplace listings
 
-    // ... (categories arrays remain same) ...
+
+    // Categories and filters data
+    const categories = ['All Categories', 'Vegetables', 'Fruits', 'Grains', 'Dairy', 'Poultry', 'Livestock', 'Seeds', 'Fertilizers'];
+    const states = ['All States', 'Punjab', 'Haryana', 'Uttar Pradesh', 'Maharashtra', 'Karnataka', 'Tamil Nadu', 'Gujarat', 'Rajasthan', 'Madhya Pradesh'];
+    const units = ['kg', 'quintal', 'ton', 'piece', 'dozen', 'liter'];
+
+    // Market prices data
+    const marketPrices = [
+        { crop: 'Wheat', price: 2500, trend: 'up', change: 5 },
+        { crop: 'Rice', price: 3200, trend: 'down', change: 2 },
+        { crop: 'Tomato', price: 45, trend: 'up', change: 12 },
+        { crop: 'Potato', price: 25, trend: 'down', change: 8 },
+        { crop: 'Onion', price: 35, trend: 'up', change: 15 }
+    ];
+
+    // Search suggestions
+    const searchSuggestions = searchQuery.length >= 2
+        ? produceListings
+            .filter(item =>
+                item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                item.seller.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                item.location.toLowerCase().includes(searchQuery.toLowerCase())
+            )
+            .map(item => item.name)
+            .filter((value, index, self) => self.indexOf(value) === index)
+            .slice(0, 5)
+        : [];
+
+    // Product suggestions based on category
+    const getProductSuggestions = () => {
+        const suggestions = {
+            'Vegetables': ['Tomato', 'Potato', 'Onion', 'Cabbage', 'Cauliflower', 'Carrot', 'Beans', 'Peas', 'Spinach', 'Brinjal'],
+            'Fruits': ['Apple', 'Banana', 'Mango', 'Orange', 'Grapes', 'Watermelon', 'Papaya', 'Guava', 'Pomegranate', 'Strawberry'],
+            'Grains': ['Wheat', 'Rice', 'Maize', 'Barley', 'Millet', 'Sorghum', 'Oats'],
+            'Dairy': ['Milk', 'Ghee', 'Butter', 'Cheese', 'Paneer', 'Curd'],
+            'Poultry': ['Chicken', 'Eggs', 'Duck', 'Turkey'],
+            'Livestock': ['Cow', 'Buffalo', 'Goat', 'Sheep'],
+            'Seeds': ['Wheat Seeds', 'Rice Seeds', 'Vegetable Seeds', 'Flower Seeds'],
+            'Fertilizers': ['Organic Fertilizer', 'NPK Fertilizer', 'Urea', 'Compost']
+        };
+        return suggestions[newListing.category] || [];
+    };
+
 
     // Handle image upload
     const handleImageUpload = (e) => {

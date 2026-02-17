@@ -5,7 +5,7 @@ import {
     Tractor, Wrench, Settings, Navigation, ChevronDown
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import SearchBarWithAutocomplete from '../components/search-bar-autocomplete';
+import SearchBarWithAutocomplete from '../components/search-bar-autocomplete.jsx';
 
 const RentalsPage = () => {
     const [searchQuery, setSearchQuery] = useState('');

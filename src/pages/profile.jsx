@@ -4,7 +4,7 @@ import { User, Star, Package, MapPin, Calendar, Shield, Award, MessageCircle } f
 import { cn } from '../lib/utils';
 import { useAuth } from '../context/auth-context';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const UserProfilePage = () => {
     const { userId } = useParams();
