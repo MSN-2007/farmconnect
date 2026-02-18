@@ -73,29 +73,25 @@ const AIAssistantPage = () => {
     const smartResponse = async (query) => {
         const lower = query.toLowerCase();
 
-        // 1. First, attempt to get response from the Real AI Gateway (with key rotation)
-        const liveResponse = await getAIResponse(query);
-        if (liveResponse) {
-            // AI Gateway response received
-            return liveResponse.text;
+        // 1. First, attempt to get response from the Real AI Gateway
+        try {
+            const liveResponse = await getAIResponse(query);
+            if (liveResponse && liveResponse.text) {
+                return liveResponse.text;
+            }
+        } catch (e) {
+            console.warn("AI Gateway fallback triggered");
         }
 
-        // 2. Fallback to Local Knowledge Base if API is offline or keys missing
+        // 2. Fallback to Local Knowledge Base ONLY if API is offline
         for (const category in KNOWLEDGE_BASE) {
             if (KNOWLEDGE_BASE[category].keywords.some(k => lower.includes(k))) {
-                // Fallback to Local Knowledge Base
                 return KNOWLEDGE_BASE[category].response;
             }
         }
 
-        // Default or complex response
-        if (lower.length < 5) {
-            // Default short query response
-            return "I'm listening. Please ask a specific farming question like 'What is the wheat price today?' or 'How to control aphids?'";
-        }
-
-        // Default complex query response
-        return "I've analyzed your question about '" + query + "'. While I have extensive data on Weather, Mandi Prices, Pests, Fertilizer, Seeds, Irrigation, Livestock, Organic Farming, and Storage, this specific query requires more context. \n\nI recommend checking our specialized modules like 'Farm Plan' for personalized scheduling, or I can connect you with a specialized Krishi Vigyan Kendra expert. Would you like me to find the nearest expert for you?";
+        // 3. Last Resort: Helpful Fallback
+        return "I'm having trouble connecting to my primary agricultural database. However, I can still help with Weather, Mandi Prices, and Pest Control. Could you please rephrase your farming question more specifically?";
     };
 
     const scrollToBottom = () => {

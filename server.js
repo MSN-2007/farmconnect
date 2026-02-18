@@ -436,7 +436,71 @@ app.post('/api/ai/analyze-image',
         }
     });
 
+
+// 2.2 Generic AI Generation (Chatbot)
+app.post('/api/ai/generate',
+    authenticateToken,
+    [
+        body('prompt').notEmpty().withMessage('Prompt is required').trim().isLength({ max: 2000 })
+    ],
+    async (req, res) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            return res.status(400).json({ errors: errors.array() });
+        }
+
+        try {
+            const { prompt } = req.body;
+            const apiKey = process.env.AI_GEMINI_KEY;
+
+            if (!apiKey) {
+                return res.status(500).json({ error: 'AI service unavailable' });
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+            // 🌾 Precision Agricultural System Prompt
+            const systemPrompt = `You are "Kisan AI", an expert agricultural scientist and agronomist. 
+Your goal is to provide point-precise, scientific, and SHORT advice to farmers.
+Rules:
+1. Be extremely brief and direct. 
+2. Use bullet points for steps.
+3. If asking for pest control, give specific chemical/organic names and dosages.
+4. If asked about crops, give specific varieties and planting dates.
+5. If the query is not about farming, politely steer them back to agriculture.
+6. Maximum 3-4 short points per response.
+7. Avoid long introductions or generic legal disclaimers unless absolutely critical.
+
+User Question: ${prompt}`;
+
+            const payload = {
+                contents: [{
+                    parts: [{ text: systemPrompt }]
+                }],
+                generationConfig: {
+                    temperature: 0.7,
+                    topK: 40,
+                    topP: 0.95,
+                    maxOutputTokens: 300,
+                }
+            };
+
+            const response = await axios.post(url, payload, { timeout: 20000 });
+            const aiData = response.data;
+
+            if (!aiData || !aiData.candidates || !aiData.candidates[0].content) {
+                throw new Error('Invalid response from AI Service');
+            }
+
+            res.json(aiData);
+        } catch (error) {
+            console.error('AI Generate Error:', error.message);
+            res.status(500).json({ error: 'AI failed to generate response' });
+        }
+    });
+
 // 3. Listings (Buy & Sell)
+
 app.get('/api/listings', async (req, res) => {
     try {
         const { category, state } = req.query;
