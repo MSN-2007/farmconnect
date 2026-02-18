@@ -56,12 +56,33 @@ const WeatherPage = () => {
         const manager = (await import('../lib/offline-data-manager')).default;
 
         try {
-            // Attempt to get real latitude/longitude
-            const pos = await new Promise((res, rej) => navigator.geolocation.getCurrentPosition(res, rej));
+            // 1. Get real location
+            console.log("📍 [Weather] Requesting geolocation...");
+            const pos = await new Promise((res, rej) => {
+                navigator.geolocation.getCurrentPosition(res, rej, {
+                    enableHighAccuracy: true,
+                    timeout: 10000
+                });
+            });
+
+            const { latitude, longitude } = pos.coords;
+            console.log(`📍 [Weather] Location acquired: ${latitude}, ${longitude}`);
+
+            // 2. Fetch atmospheric data (Weather Proxy)
             const realData = await smartFetch('weather', {
-                lat: pos.coords.latitude,
-                lon: pos.coords.longitude,
+                lat: latitude,
+                lon: longitude,
                 units: 'metric'
+            });
+
+            // 3. Fetch Agricultural Intelligence (Soil/Water)
+            console.log("🧠 [Weather] Fetching regional intelligence...");
+            const agriIntel = await smartFetch('agri-intelligence', {
+                lat: latitude,
+                lon: longitude
+            }).catch(err => {
+                console.warn("⚠️ Agri-Intelligence failed, using estimates:", err);
+                return null;
             });
 
             if (realData) {
@@ -72,15 +93,24 @@ const WeatherPage = () => {
                     minTemp: Math.round(realData.main.temp_min),
                     maxTemp: Math.round(realData.main.temp_max),
                     humidity: realData.main.humidity,
-                    windSpeed: Math.round(realData.wind.speed * 3.6), // m/s to km/h
-                    windDirection: 'North-East', // Could be calculated from wind.deg
+                    windSpeed: Math.round(realData.wind.speed * 3.6),
+                    windDirection: 'North-East',
                     pressure: realData.main.pressure,
                     visibility: Math.round(realData.visibility / 1000),
-                    uvIndex: 6, // uv index needs separate one-call api
+                    uvIndex: 6,
                     aqi: 42,
-                    precipProb: realData.clouds.all + '%'
+                    precipProb: (realData.clouds?.all || 0) + '%',
+                    // Mix in Agricultural Intelligence
+                    soilType: agriIntel?.soilType || 'Detecting...',
+                    soilPH: agriIntel?.soilPH || 7.0,
+                    soilMoisture: agriIntel?.soilMoistureEstimate || 45,
+                    soilTemp: Math.round(realData.main.temp - 2), // Estimation
+                    waterTable: agriIntel?.waterTableDepth || 'Unknown',
+                    scientificNote: agriIntel?.scientificNote || 'Scientific profiling complete for your region.'
                 };
+
                 setWeatherData(prev => ({ ...prev, ...freshDetailed }));
+                console.log("✅ [Weather] Sync complete with real-time data");
 
                 const forecastData = generateForecastData(15).map(d => ({
                     ...d,
@@ -89,12 +119,13 @@ const WeatherPage = () => {
                 }));
                 await manager.saveWeatherData(forecastData);
             } else {
-                // Fallback to high-fidelity mock
-                const freshData = generateForecastData(15).map(d => ({ ...d, location: 'Current Location' }));
-                await manager.saveWeatherData(freshData);
+                throw new Error("Weather service returned no data");
             }
         } catch (e) {
-            console.error("Sync failed, saving mock data", e);
+            console.error("❌ [Weather] Sync failed:", e.message);
+            const errorMsg = e.code === 1 ? "Location permission denied" : e.message;
+            alert(`Weather Sync Failed: ${errorMsg}. Please ensure GPS is on and try again.`);
+
             const freshData = generateForecastData(15).map(d => ({ ...d, location: 'Current Location' }));
             await manager.saveWeatherData(freshData);
         }
@@ -358,50 +389,37 @@ const WeatherPage = () => {
                         <div className="p-3 bg-nature-50 rounded-2xl">
                             <Sprout className="h-6 w-6 text-nature-700" />
                         </div>
-                        <span className="text-[10px] font-black text-nature-700 bg-nature-100 px-3 py-1 rounded-full uppercase tracking-widest">Sensors 4/4</span>
+                        <span className="text-[10px] font-black text-nature-700 bg-nature-100 px-3 py-1 rounded-full uppercase tracking-widest">{currentWeather.soilType}</span>
                     </div>
-                    <p className="text-gray-400 font-black uppercase tracking-widest text-[10px] mb-1">Soil Temperature</p>
+                    <p className="text-gray-400 font-black uppercase tracking-widest text-[10px] mb-1">Soil pH & Moisture</p>
                     <div className="flex items-baseline gap-2">
-                        <h3 className="text-3xl font-black text-gray-900">{currentWeather.soilTemp}°C</h3>
-                        <span className="text-gray-400 font-bold">avg.</span>
+                        <h3 className="text-3xl font-black text-gray-900">{currentWeather.soilPH} pH</h3>
+                        <span className="text-gray-400 font-bold">Avg.</span>
                     </div>
                     <p className="text-sm font-bold text-gray-600 mt-4 leading-relaxed">
-                        Moisture Content: <span className="text-nature-900">{currentWeather.soilMoisture}%</span>
+                        Moisture: <span className="text-nature-900">{currentWeather.soilMoisture}%</span> | Temp: <span className="text-nature-900">{currentWeather.soilTemp}°C</span>
                     </p>
                     <div className="mt-6 h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-nature-700 rounded-full" style={{ width: '45%' }}></div>
+                        <div className="h-full bg-nature-700 rounded-full" style={{ width: `${currentWeather.soilMoisture}%` }}></div>
                     </div>
                 </div>
 
-                {/* Daylight Cycle Card */}
+                {/* Ground Water & Sunlight Card */}
                 <div className="bg-white rounded-[32px] p-8 border border-gray-100 shadow-sm">
-                    <div className="flex items-center gap-4 mb-8">
-                        <div className="flex-1 space-y-1">
-                            <p className="text-[10px] font-black text-gray-400 uppercase">Sunrise</p>
-                            <div className="flex items-center gap-2">
-                                <Sunrise className="h-4 w-4 text-amber-500" />
-                                <p className="font-black text-gray-900">06:24 AM</p>
-                            </div>
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="p-3 bg-blue-50 rounded-2xl">
+                            <Droplets className="h-6 w-6 text-blue-600" />
                         </div>
-                        <div className="flex-1 space-y-1 text-right">
-                            <p className="text-[10px] font-black text-gray-400 uppercase">Sunset</p>
-                            <div className="flex items-center justify-end gap-2">
-                                <p className="font-black text-gray-900">06:48 PM</p>
-                                <Sunset className="h-4 w-4 text-amber-700" />
-                            </div>
-                        </div>
+                        <span className="text-[10px] font-black text-blue-600 bg-blue-100 px-3 py-1 rounded-full uppercase tracking-widest">Ground Water</span>
                     </div>
-                    <div className="relative pt-6">
-                        <div className="absolute inset-0 top-1/2 flex items-center">
-                            <div className="w-full border-t-2 border-dashed border-gray-100"></div>
-                        </div>
-                        <div className="relative flex justify-center">
-                            <div className="w-full h-12 border-t-4 border-amber-200 rounded-t-full relative overflow-hidden">
-                                <div className="absolute top-0 left-[60%] w-4 h-4 bg-amber-500 rounded-full shadow-lg shadow-amber-500/50"></div>
-                            </div>
-                        </div>
-                        <p className="text-center text-[10px] font-black text-gray-400 uppercase tracking-widest mt-4">12h 24m Daylight Remaining</p>
+                    <p className="text-gray-400 font-black uppercase tracking-widest text-[10px] mb-1">Estimated Water Table</p>
+                    <div className="flex items-baseline gap-2">
+                        <h3 className="text-3xl font-black text-gray-900">{currentWeather.waterTable}m</h3>
+                        <span className="text-gray-400 font-bold">Below Surface</span>
                     </div>
+                    <p className="text-xs font-bold text-gray-500 mt-4 leading-relaxed">
+                        Scientific Note: <span className="text-blue-900">{currentWeather.scientificNote || "Updating from regional data..."}</span>
+                    </p>
                 </div>
             </div>
 

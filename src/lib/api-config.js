@@ -84,6 +84,11 @@ export const smartFetch = async (service, params = {}) => {
         } else if (service === 'market') {
             const queryParams = new URLSearchParams(params).toString();
             url = `${API_CONFIG.market.baseUrl}?${queryParams}`;
+        } else if (service === 'agri-intelligence') {
+            const queryParams = new URLSearchParams(params).toString();
+            url = `${BACKEND_URL}/api/agri-intelligence?${queryParams}`;
+        } else if (service === 'experts') {
+            url = `${BACKEND_URL}/api/experts`;
         } else {
             throw new Error(`Service ${service} not supported via proxy yet.`);
         }

@@ -545,7 +545,83 @@ app.get('/api/market', async (req, res) => {
     }
 });
 
-// 3. Listings (Buy & Sell)
+// 5.2 Expert Consultation Data
+app.get('/api/experts', (req, res) => {
+    const experts = [
+        {
+            id: 1,
+            name: 'Dr. Ramesh Sharma',
+            initials: 'DRS',
+            qualification: 'PhD in Plant Pathology',
+            specialization: 'Crop Disease',
+            experience: '15 years experience',
+            rating: 4.9,
+            consultations: 523,
+            languages: ['Hindi', 'English', 'Punjabi'],
+            status: 'Available',
+            color: 'bg-green-700'
+        },
+        {
+            id: 2,
+            name: 'Dr. Priya Mehta',
+            initials: 'DPM',
+            qualification: 'MSc Agriculture',
+            specialization: 'Soil Health',
+            experience: '10 years experience',
+            rating: 4.8,
+            consultations: 412,
+            languages: ['Hindi', 'English'],
+            status: 'Available',
+            color: 'bg-green-700'
+        },
+        {
+            id: 3,
+            name: 'Dr. Vijay Singh',
+            initials: 'DVS',
+            qualification: 'PhD in Entomology',
+            specialization: 'Pest Management',
+            experience: '12 years experience',
+            rating: 4.7,
+            consultations: 389,
+            languages: ['Hindi', 'English', 'Marathi'],
+            status: 'Busy',
+            color: 'bg-green-600'
+        },
+        {
+            id: 4,
+            name: 'Dr. Sunita Patel',
+            initials: 'DSP',
+            qualification: 'MSc Horticulture',
+            specialization: 'Organic Farming',
+            experience: '8 years experience',
+            rating: 4.9,
+            consultations: 298,
+            languages: ['Hindi', 'English', 'Gujarati'],
+            status: 'Available',
+            color: 'bg-green-700'
+        }
+    ];
+    res.json(experts);
+});
+
+// 5.3 Agricultural News Proxy
+app.get('/api/news', async (req, res) => {
+    try {
+        const apiKey = process.env.NEWS_API_KEY_1;
+        if (!apiKey) return res.status(500).json({ error: 'News service unavailable' });
+
+        const url = `https://newsapi.org/v2/everything?q=agriculture+farming+india&sortBy=publishedAt&apiKey=${apiKey}&language=en`;
+        const response = await axios.get(url, { timeout: 10000 });
+
+        // Transform to match front-end expectation
+        res.json({ articles: response.data.articles || [] });
+    } catch (error) {
+        console.error('News Proxy Error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch news' });
+    }
+});
+
+// 6. Listings (Buy & Sell)
 
 app.get('/api/listings', async (req, res) => {
     try {
@@ -657,29 +733,94 @@ app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
     }
 });
 
-// 5. Weather Proxy
+// 5. Weather Proxy with Key Rotation
 app.get('/api/weather', async (req, res) => {
     try {
         const { lat, lon } = req.query;
-        const apiKey = process.env.WEATHER_API_KEY;
-        if (!apiKey) return res.status(500).json({ error: 'Missing Weather Key' });
+        console.log(`🌤️ Weather Request: lat=${lat}, lon=${lon}`);
 
-        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
-        const response = await axios.get(url);
-        res.json(response.data);
-    } catch (e) { res.status(500).json({ error: 'Weather Fetch Failed' }); }
+        const keys = [process.env.WEATHER_API_KEY, process.env.WEATHER_API_KEY_BACKUP].filter(Boolean);
+        if (keys.length === 0) return res.status(500).json({ error: 'Missing Weather Keys' });
+
+        let lastError;
+        for (const key of keys) {
+            try {
+                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${key}&units=metric`;
+                const response = await axios.get(url, { timeout: 8000 });
+                console.log("✅ Weather API Success (Key Rotation)");
+                return res.json(response.data);
+            } catch (e) {
+                lastError = e;
+                console.warn(`⚠️ Weather Key failed, trying next...`);
+            }
+        }
+        throw lastError;
+    } catch (e) {
+        console.error("❌ Weather API Error:", e.response?.data || e.message);
+        res.status(500).json({ error: 'Weather Fetch Failed' });
+    }
 });
 
 app.get('/api/weather/forecast', async (req, res) => {
     try {
         const { lat, lon } = req.query;
-        const apiKey = process.env.WEATHER_API_KEY;
-        if (!apiKey) return res.status(500).json({ error: 'Missing Weather Key' });
+        console.log(`📅 Forecast Request: lat=${lat}, lon=${lon}`);
 
-        const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${apiKey}&units=metric`;
-        const response = await axios.get(url);
-        res.json(response.data);
-    } catch (e) { res.status(500).json({ error: 'Forecast Fetch Failed' }); }
+        const keys = [process.env.WEATHER_API_KEY, process.env.WEATHER_API_KEY_BACKUP].filter(Boolean);
+        if (keys.length === 0) return res.status(500).json({ error: 'Missing Weather Keys' });
+
+        let lastError;
+        for (const key of keys) {
+            try {
+                const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${key}&units=metric`;
+                const response = await axios.get(url, { timeout: 8000 });
+                console.log("✅ Forecast API Success (Key Rotation)");
+                return res.json(response.data);
+            } catch (e) {
+                lastError = e;
+                console.warn(`⚠️ Forecast Key failed, trying next...`);
+            }
+        }
+        throw lastError;
+    } catch (e) {
+        console.error("❌ Forecast API Error:", e.response?.data || e.message);
+        res.status(500).json({ error: 'Forecast Fetch Failed' });
+    }
+});
+
+// 5.1 Gemini Agricultural Intelligence (Soil & Water)
+app.get('/api/agri-intelligence', async (req, res) => {
+    try {
+        const { lat, lon } = req.query;
+        console.log(`🧠 Agri-Intelligence Request for: ${lat}, ${lon}`);
+        const apiKey = process.env.AI_GEMINI_KEY;
+        if (!apiKey) return res.status(500).json({ error: 'AI Intelligence unavailable' });
+
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+        const prompt = `As an agricultural scientist and geologist, analyze this location: Latitude ${lat}, Longitude ${lon}.
+Return a JSON object with this EXACT structure:
+{
+  "soilType": "String (e.g. Red Sandy Loam)",
+  "soilPH": Number (e.g. 6.5),
+  "waterTableDepth": Number (depth in meters),
+  "soilMoistureEstimate": Number (percentage 0-100),
+  "scientificNote": "String (Short expert note for a farmer)"
+}
+Only return the JSON. No markdown.`;
+
+        const payload = {
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: "application/json" }
+        };
+
+        const response = await axios.post(url, payload, { timeout: 15000 });
+        const data = JSON.parse(response.data?.candidates?.[0]?.content?.parts?.[0]?.text || "{}");
+        res.json(data);
+    } catch (error) {
+        console.error('Agri-Intelligence Error:', error.message);
+        res.status(500).json({ error: 'Failed to fetch agricultural intelligence' });
+    }
 });
 
 // 6. Analytics (Real-time Graphs)

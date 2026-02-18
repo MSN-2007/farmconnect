@@ -12,60 +12,23 @@ const VetPage = () => {
         notes: ''
     });
 
-    const experts = [
-        {
-            id: 1,
-            name: 'Dr. Ramesh Sharma',
-            initials: 'DRS',
-            qualification: 'PhD in Plant Pathology',
-            specialization: 'Crop Disease',
-            experience: '15 years experience',
-            rating: 4.9,
-            consultations: 523,
-            languages: ['Hindi', 'English', 'Punjabi'],
-            status: 'Available',
-            color: 'bg-green-700'
-        },
-        {
-            id: 2,
-            name: 'Dr. Priya Mehta',
-            initials: 'DPM',
-            qualification: 'MSc Agriculture',
-            specialization: 'Soil Health',
-            experience: '10 years experience',
-            rating: 4.8,
-            consultations: 412,
-            languages: ['Hindi', 'English'],
-            status: 'Available',
-            color: 'bg-green-700'
-        },
-        {
-            id: 3,
-            name: 'Dr. Vijay Singh',
-            initials: 'DVS',
-            qualification: 'PhD in Entomology',
-            specialization: 'Pest Management',
-            experience: '12 years experience',
-            rating: 4.7,
-            consultations: 389,
-            languages: ['Hindi', 'English', 'Marathi'],
-            status: 'Busy',
-            color: 'bg-green-600'
-        },
-        {
-            id: 4,
-            name: 'Dr. Sunita Patel',
-            initials: 'DSP',
-            qualification: 'MSc Horticulture',
-            specialization: 'Organic Farming',
-            experience: '8 years experience',
-            rating: 4.9,
-            consultations: 298,
-            languages: ['Hindi', 'English', 'Gujarati'],
-            status: 'Available',
-            color: 'bg-green-700'
-        }
-    ];
+    const [experts, setExperts] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchExperts = async () => {
+            const { smartFetch } = await import('../lib/api-config');
+            try {
+                const data = await smartFetch('experts');
+                if (data) setExperts(data);
+            } catch (err) {
+                console.error("Failed to fetch experts:", err);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchExperts();
+    }, []);
 
     const handleBookConsultation = (expert) => {
         setSelectedExpert(expert);
