@@ -64,28 +64,54 @@ export const smartFetch = async (service, params = {}) => {
         let url;
         let method = 'GET';
         let body = null;
-        let headers = {};
+        let headers = {
+            'Accept': 'application/json'
+        };
 
         // Construct URL based on service
         if (service === 'weather') {
-            const endpoint = params.forecast ? API_CONFIG.weather.forecastUrl : API_CONFIG.weather.baseUrl;
+            const endpoint = params.forecast ? API_CONFIG.forecast.baseUrl : API_CONFIG.weather.baseUrl;
             const queryParams = new URLSearchParams(params).toString();
             url = `${endpoint}?${queryParams}`;
         } else if (service === 'ai') {
             url = API_CONFIG.ai.endpoint;
             method = 'POST';
             body = JSON.stringify(params);
-            headers = { 'Content-Type': 'application/json' };
+            headers['Content-Type'] = 'application/json';
         } else if (service === 'news') {
             const queryParams = new URLSearchParams(params).toString();
             url = `${API_CONFIG.news.baseUrl}?${queryParams}`;
+        } else if (service === 'market') {
+            const queryParams = new URLSearchParams(params).toString();
+            url = `${API_CONFIG.market.baseUrl}?${queryParams}`;
         } else {
             throw new Error(`Service ${service} not supported via proxy yet.`);
         }
 
-        const response = await fetch(url, { method, headers, body });
+        // 🛡️ CSRF Handling for POST requests
+        if (method === 'POST') {
+            try {
+                const csrfRes = await fetch(`${BACKEND_URL}/api/csrf-token`, { credentials: 'include' });
+                const { csrfToken } = await csrfRes.json();
+                if (csrfToken) {
+                    headers['X-CSRF-Token'] = csrfToken;
+                }
+            } catch (e) {
+                console.warn("CSRF token fetch failed, proceeding without it...");
+            }
+        }
 
-        if (!response.ok) throw new Error(`Proxy Error: ${response.status}`);
+        const response = await fetch(url, {
+            method,
+            headers,
+            body,
+            credentials: 'include' // 🔒 REQUIRED for httpOnly cookies
+        });
+
+        if (!response.ok) {
+            const errData = await response.json().catch(() => ({}));
+            throw new Error(errData.error || `Proxy Error: ${response.status}`);
+        }
 
         const data = await response.json();
 
@@ -97,7 +123,7 @@ export const smartFetch = async (service, params = {}) => {
 
         return data;
     } catch (error) {
-        console.error(`❌ Proxy Request Failed:`, error.message);
+        console.error(`❌ Proxy Request Failed (${service}):`, error.message);
         return null;
     }
 };

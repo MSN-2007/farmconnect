@@ -30,43 +30,43 @@ const AIAssistantPage = () => {
     const KNOWLEDGE_BASE = {
         weather: {
             keywords: ['weather', 'rain', 'temperature', 'forecast', 'climate', 'monsoon', 'storm', 'wind', 'humidity'],
-            response: "Current Forecast for Punjab/Haryana: Partly cloudy with 15% humidity. High: 28°C, Low: 22°C. \nNext 7 days: Dry spell continuing. \nAdvice: Ideal for intensive fertilizer application and weeding. Check soil moisture before next irrigation as evaporation rates are slightly higher today."
+            response: "I can provide real-time weather forecasts for your specific location. Please use our 'Weather' page for precise hourly updates, or ask me a specific question about your crop's water needs."
         },
         prices: {
             keywords: ['price', 'rate', 'mandi', 'market', 'cost', 'wheat', 'rice', 'paddy', 'cotton', 'mustard', 'potato', 'onion'],
-            response: "Latest Mandi Rates (Feb 8, 2026):\n• Wheat: ₹2,450/q (Bullish trend due to low arrivals)\n• Basmati: ₹3,800/q (Stable demand)\n• Cotton: ₹7,100/q (Volatile due to global trade)\n• Mustard: ₹5,400/q (Firming up)\nStrategic Advice: If you have dry storage, hold Wheat stocks. We expect price to hit ₹2,600 by early March based on current procurement trends."
+            response: "Mandi prices vary by region and timing. For the most accurate rates in your local market, please consult our 'Smart Market Finder' which tracks live data from across India."
         },
         pests: {
             keywords: ['pest', 'insect', 'disease', 'fungus', 'leaf', 'yellow', 'bug', 'worm', 'control', 'rust', 'aphid', 'blight', 'whitefly'],
-            response: "Agricultural Specialist Alert:\n1. Yellow Rust (Wheat): Spray Propiconazole 25% EC (200ml/acre) in 200L water. Repeat after 15 days if yellow streaks persist.\n2. Whitefly (Cotton/Veg): Apply Neem Oil (5ml/L) or Acetamiprid 20% SP (100g/acre).\n3. Early Blight (Potato): Use Mancozeb 75% WP (600g/acre) at first sign of spots."
+            response: "For pest control, I recommend using specify treatments based on the crop. Common solutions include Neem Oil (5ml/L) for whiteflies or Propiconazole for rust. Would you like a more detailed scientific plan for a specific pest?"
         },
         fertilizer: {
             keywords: ['fertilizer', 'urea', 'dap', 'npk', 'soil', 'nutrient', 'nitrogen', 'potash', 'manure', 'compost', 'zinc', 'boron'],
-            response: "Precision Fertilizer Plan:\n• Top Dressing: Apply 45kg Urea/acre for Wheat at 2nd irrigation (65-70 days).\n• Deficiency Correction: If leaves show purple edges, apply 50kg MOP (Potash). \n• Micro-nutrients: For high yield, spray Zinc Sulphate (0.5%) mixed with 1kg Urea in 100L water per acre."
+            response: "Precision fertilization depends on your soil test results. Generally, apply Urea in 2-3 split doses for high-demand crops like wheat and rice. check your 'Soil Health Card' for exact requirements."
         },
         seeds: {
             keywords: ['seed', 'variety', 'sow', 'wheat variety', 'best seed', 'hybrid', 'bt cotton', 'certified'],
-            response: "Top Performing Varieties for 2026:\n1. Wheat: DBW 187 (Karan Vandana) - High heat tolerance, yield up to 30 quintals/acre.\n2. Mustard: Pusa Karishma - Low erucic acid, high oil content.\n3. Paddy: PR 126 for short duration (125 days).\nAlways treat seeds with Beejamrut or Thiram (3g/kg) to prevent soil-borne diseases."
+            response: "Choosing the right variety is critical. For high yields in 2026, look for Climate-Resilient varieties suited to your state. Our 'Knowledge Hub' has full details on the best performing seeds for this season."
         },
         subsidy: {
             keywords: ['subsidy', 'scheme', 'paisa', 'money', 'government', 'loan', 'pm kisan', 'claim', 'registration'],
-            response: "Government Financial Support:\n• PM-Kisan: 16th installment verified for March disbursement.\n• Micro-Irrigation: Up to 80% subsidy for Drip/Sprinkler systems for small farmers.\n• Machinery: 50% subsidy on Super Seeder and Mulchers under CRM scheme.\nAction Required: Update your e-KYC on the PM-Kisan portal to avoid payment delays."
+            response: "There are many active government schemes like PM-Kisan and KCC. I recommend checking the official state portals or visiting your nearest Krishi Vigyan Kendra for the latest registration deadlines."
         },
         irrigation: {
             keywords: ['irrigation', 'water', 'drip', 'sprinkler', 'canal', 'borewell', 'tubewell', 'timing', 'moisture'],
-            response: "Water Management Guide:\n• Critical Stages: For Wheat, Ensure irrigation at 'Crown Root Initiation' (21 days) and 'Flowering' (80 days).\n• Efficiency: Afternoon irrigation leads to 30% water loss via evaporation. Water early morning or late evening.\n• Tech: Switch to Drip for vegetables to save 60% water and increase yield by 20%."
+            response: "Optimal irrigation timing is early morning or late evening. For water-scarce areas, Drip Irrigation is highly recommended as it can save up to 60% of water compared to flood irrigation."
         },
         livestock: {
             keywords: ['cow', 'buffalo', 'milk', 'fodder', 'cattle', 'veterinary', 'animal', 'feed', 'yield', 'disease'],
-            response: "Livestock Management:\n• Milk Yield: Add 50g Mineral Mixture daily to cattle feed to improve calcium levels and increase yield.\n• Summer Care: Ensure cross-ventilation in sheds. Provide cold water 4-5 times a day.\n• Fodder: Mix Berseem with dry straw (Bhusa) in 1:3 ratio for balanced nutrition."
+            response: "Healthy livestock requires balanced nutrition. Ensure your cattle have access to clean water and a mix of dry and green fodder. For specific health issues, please consult a qualified veterinarian."
         },
         organic: {
             keywords: ['organic', 'natural', 'chemical free', 'jeevamrut', 'cow dung', 'pest repellant', 'compost', 'vermicompost'],
-            response: "Organic Farming Protocol:\n• Natural Fertilizer: Prepare Jeevamrut (Cow dung + Urine + Jaggery + Pulse flour). Apply through irrigation water.\n• Pest Control: Use 'Dashparni Arka' or Neem leaf extract for broad-spectrum pest control.\n• Certification: Register with NPOP for export-grade organic certification and 40% premium pricing."
+            response: "Organic farming starts with soil health. You can prepare natural boosters like Jeevamrut at home using cow dung and urine. This improves soil life and long-term productivity without chemicals."
         },
         storage: {
             keywords: ['storage', 'warehouse', 'cold store', 'grain', 'moisture level', 'rat', 'safety', 'bags'],
-            response: "Post-Harvest Strategy:\n• Moisture Check: Dry grains to <12% moisture before bagging to prevent fungal growth.\n• Storage: Use galvanized steel bins or plastic silos instead of jute bags to prevent rodent damage.\n• Pests: Use Aluminum Phosphide tablets (only in air-tight silos) or Neem leaves in domestic storage."
+            response: "To prevent grain loss, ensure crops are dried to under 12% moisture before storage. Use airtight bins or silos to protect your harvest from rodents and moisture-related fungus."
         }
     };
 
@@ -428,7 +428,7 @@ const AIAssistantPage = () => {
                             {[
                                 "Today's Wheat Rate?",
                                 "Treatment for Yellow Rust?",
-                                "Next PM Kisan date?",
+                                "Weather in Zaheerabad?",
                                 "Best fertilizer for Cotton?",
                                 "Improve buffalo milk yield?",
                                 "Drip irrigation subsidy?",

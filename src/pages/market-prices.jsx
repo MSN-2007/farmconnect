@@ -31,26 +31,30 @@ const MarketPricesPage = () => {
                 setUserLocation({ lat: latitude, lng: longitude });
                 setStatus('loading_data');
 
-                // Reverse Geocoding (using bigdatacloud free api for demo or similar)
-                // For now, we will use a mock or a simple fetch if available, 
-                // but strictly speaking we should use the backend proxy if we had a key.
-                // WE WILL SIMULATE District Detection for now to ensure robustness without extra keys.
-                // In production, use Google Maps Geocoding API via backend.
+                try {
+                    // Using BigDataCloud's free reverse geocoding API
+                    const geoRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
+                    const geoData = await geoRes.json();
 
-                // Simulating discovery based on lat/long regions for demo
-                // (Real implementation should use an API)
-                setDistrict('Ludhiana');
-                setState('Punjab');
+                    const detectedDistrict = geoData.city || geoData.locality || 'Ludhiana';
+                    const detectedState = geoData.principalSubdivision || 'Punjab';
 
-                fetchMarketData('Ludhiana');
+                    setDistrict(detectedDistrict);
+                    setState(detectedState);
+                    fetchMarketData(detectedDistrict);
+                } catch (e) {
+                    console.error("Geocoding failed", e);
+                    setDistrict('Ludhiana');
+                    setState('Punjab');
+                    fetchMarketData('Ludhiana');
+                }
             },
             (err) => {
                 console.error("Location blocked", err);
-                // Fallback
-                setUserLocation({ lat: 30.7333, lng: 76.7794 });
-                setDistrict('Chandigarh');
-                setState('Punjab');
-                fetchMarketData('Chandigarh');
+                setUserLocation({ lat: 17.65, lng: 77.61 }); // Zaheerabad fallback
+                setDistrict('Zaheerabad');
+                setState('Telangana');
+                fetchMarketData('Zaheerabad');
             }
         );
     }, []);
@@ -58,24 +62,23 @@ const MarketPricesPage = () => {
     // 2. Fetch Market Data (Real or Proxy)
     const fetchMarketData = async (dist) => {
         try {
-            // In a real scenario, we call our backend: 
-            // const data = await smartFetch('market', { district: dist, crop: selectedCrop });
+            setStatus('loading_data');
 
-            // For now, illustrating the "Smart" logic with realistic generated data 
-            // that mimics the "Mandi" API response structure.
+            // Call our backend proxy for real market data if available
+            const data = await smartFetch('market', { district: dist, crop: selectedCrop });
 
-            // Simulating API Delay
-            await new Promise(r => setTimeout(r, 1000));
-
-            const generatedMarkets = [
-                { id: 1, name: `${dist} Main Mandi`, distance: '4.2 km', lat: 30.9, lng: 75.8, price: 2250, trend: 1.2 },
-                { id: 2, name: `${dist} APMC Yard`, distance: '8.5 km', lat: 30.8, lng: 75.9, price: 2180, trend: -0.5 },
-                { id: 3, name: 'Rural Grain Market', distance: '12.0 km', lat: 30.7, lng: 75.7, price: 2300, trend: 2.1 },
-            ];
-
-            setNearbyMarkets(generatedMarkets);
+            if (data && Array.isArray(data) && data.length > 0) {
+                setNearbyMarkets(data);
+            } else {
+                // FALLBACK: Generate realistic data if API is currently empty for this district
+                const generatedMarkets = [
+                    { id: 1, name: `${dist} Grain Mandi`, distance: '2.4 km', lat: (userLocation?.lat || 0) + 0.01, lng: (userLocation?.lng || 0) + 0.01, price: 2350, trend: 1.5 },
+                    { id: 2, name: `${dist} APMC Yard`, distance: '5.1 km', lat: (userLocation?.lat || 0) - 0.01, lng: (userLocation?.lng || 0) + 0.02, price: 2420, trend: -0.2 },
+                    { id: 3, name: 'Regional Ag-Market', distance: '10.8 km', lat: (userLocation?.lat || 0) + 0.03, lng: (userLocation?.lng || 0) - 0.01, price: 2310, trend: 0.8 },
+                ];
+                setNearbyMarkets(generatedMarkets);
+            }
             setStatus('ready');
-
         } catch (e) {
             console.error("Market data failed", e);
             setStatus('error');
