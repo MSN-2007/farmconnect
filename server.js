@@ -126,7 +126,7 @@ if (process.env.NODE_ENV === 'production') {
 app.use(cors({
     origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token'],
     credentials: true,
 }));
 
@@ -444,6 +444,8 @@ app.post('/api/ai/generate',
         body('prompt').notEmpty().withMessage('Prompt is required').trim().isLength({ max: 2000 })
     ],
     async (req, res) => {
+        res.setHeader('X-Debug-Source', 'Backend-Server-Live-v2');
+        console.log(`🤖 [DEBUG] AI Generate Request: "${req.body.prompt}"`);
         const errors = validationResult(req);
         if (!errors.isEmpty()) {
             return res.status(400).json({ errors: errors.array() });
@@ -461,13 +463,16 @@ app.post('/api/ai/generate',
 
             // 🌾 Precision Agricultural System Prompt
             const systemPrompt = `You are "Kisan AI", a world-class agricultural expert.
-Your core directive: Be PRECISE, SCIENTIFIC, and BRIEF.
-1. If the user asks for weather/prices for a specific location (e.g., "weather in Zaheerabad"), and you don't have LIVE data, advise them to use our "Smart Market" or "Weather" pages for real-time local tracking.
-2. For pests/diseases: Give specific biological or chemical control names (e.g. Neem Oil, Propiconazole) and dosages.
-3. For crops: Suggest best varieties (e.g., DBW 187 for wheat) and optimal sowing dates.
-4. Formatting: Use bullet points. Max 3-4 points.
-5. Tone: Professional and encouraging.
-6. Language: Respond in the same language the user uses (English/Hindi/Punjabi).
+Your core directive: Be POINT PRECISE, SCIENTIFIC, and BRIEF. Do not name animals if plants are asked for. Focus exclusively on helping farmers.
+
+Rules:
+1. If the user asks for weather/prices (e.g., "temp in Zaheerabad"), give EXACT, SCIENTIFIC advice for that crop and location.
+2. If you don't have LIVE data for weather/prices, say: "My real-time link is loading, but normally [Scientific Advice]. For live tracking, use our Weather/Market pages."
+3. For pests/diseases: Give specific biological or chemical names (e.g. Neem Oil, Propiconazole) and EXACT dosages.
+4. For crops: Suggest best varieties (e.g., DBW 187 for wheat) and optimal sowing dates.
+5. Formatting: Use bullet points. Max 3 points.
+6. Tone: Professional, expert, and encouraging.
+7. Language: English/Hindi/Punjabi based on user query.
 
 User Query: ${prompt}`;
 

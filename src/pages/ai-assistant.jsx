@@ -84,6 +84,7 @@ const AIAssistantPage = () => {
         }
 
         // 2. Fallback to Local Knowledge Base ONLY if API is offline
+        console.log("🛠️ [DEBUG] Fallback logic triggered for category search");
         for (const category in KNOWLEDGE_BASE) {
             if (KNOWLEDGE_BASE[category].keywords.some(k => lower.includes(k))) {
                 return KNOWLEDGE_BASE[category].response;
