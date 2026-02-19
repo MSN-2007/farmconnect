@@ -14,6 +14,7 @@ const WeatherPage = () => {
     const [isSyncing, setIsSyncing] = useState(false);
     const [lastSynced, setLastSynced] = useState(null);
     const [weatherData, setWeatherData] = useState({
+        locationName: 'Simulated Farm',
         temp: 28,
         condition: 'Partly Cloudy',
         feelsLike: 30,
@@ -35,8 +36,10 @@ const WeatherPage = () => {
         dewPoint: 21,
         aqi: 42,
         aqiLevel: 'Good',
-        precipProb: '10%'
+        precipProb: '10%',
+        scientificNote: 'Awaiting local sync...'
     });
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         const syncWeather = async () => {
@@ -51,80 +54,93 @@ const WeatherPage = () => {
         syncWeather();
     }, []);
 
-    const handleSync = async () => {
+    const handleSync = async (cityName = null) => {
         setIsSyncing(true);
         const manager = (await import('../lib/offline-data-manager')).default;
 
         try {
-            // 1. Get real location
-            console.log("📍 [Weather] Requesting geolocation...");
-            const pos = await new Promise((res, rej) => {
-                navigator.geolocation.getCurrentPosition(res, rej, {
-                    enableHighAccuracy: true,
-                    timeout: 10000
-                });
-            });
+            let latitude, longitude;
+            let queryParams = {};
 
-            const { latitude, longitude } = pos.coords;
-            console.log(`📍 [Weather] Location acquired: ${latitude}, ${longitude}`);
+            if (cityName && typeof cityName === 'string' && cityName.trim() !== '') {
+                queryParams = { q: cityName.trim() };
+                console.log(`📍 [Weather] Searching for city: ${cityName}`);
+            } else {
+                // 1. Get real location via GPS
+                console.log("📍 [Weather] Requesting geolocation...");
+                const pos = await new Promise((res, rej) => {
+                    navigator.geolocation.getCurrentPosition(res, rej, {
+                        enableHighAccuracy: true,
+                        timeout: 10000
+                    });
+                });
+                latitude = pos.coords.latitude;
+                longitude = pos.coords.longitude;
+                queryParams = { lat: latitude, lon: longitude };
+                console.log(`📍 [Weather] Geolocation acquired: ${latitude}, ${longitude}`);
+            }
 
             // 2. Fetch atmospheric data (Weather Proxy)
             const realData = await smartFetch('weather', {
-                lat: latitude,
-                lon: longitude,
+                ...queryParams,
                 units: 'metric'
             });
 
+            if (!realData) throw new Error("Weather service returned no data");
+
             // 3. Fetch Agricultural Intelligence (Soil/Water)
+            // Use coords from weather response (more accurate for city search)
+            const targetLat = realData.coord?.lat || latitude;
+            const targetLon = realData.coord?.lon || longitude;
+
             console.log("🧠 [Weather] Fetching regional intelligence...");
             const agriIntel = await smartFetch('agri-intelligence', {
-                lat: latitude,
-                lon: longitude
+                lat: targetLat,
+                lon: targetLon
             }).catch(err => {
                 console.warn("⚠️ Agri-Intelligence failed, using estimates:", err);
                 return null;
             });
 
-            if (realData) {
-                const freshDetailed = {
-                    temp: Math.round(realData.main.temp),
-                    condition: realData.weather[0].main,
-                    feelsLike: Math.round(realData.main.feels_like),
-                    minTemp: Math.round(realData.main.temp_min),
-                    maxTemp: Math.round(realData.main.temp_max),
-                    humidity: realData.main.humidity,
-                    windSpeed: Math.round(realData.wind.speed * 3.6),
-                    windDirection: 'North-East',
-                    pressure: realData.main.pressure,
-                    visibility: Math.round(realData.visibility / 1000),
-                    uvIndex: 6,
-                    aqi: 42,
-                    precipProb: (realData.clouds?.all || 0) + '%',
-                    // Mix in Agricultural Intelligence
-                    soilType: agriIntel?.soilType || 'Detecting...',
-                    soilPH: agriIntel?.soilPH || 7.0,
-                    soilMoisture: agriIntel?.soilMoistureEstimate || 45,
-                    soilTemp: Math.round(realData.main.temp - 2), // Estimation
-                    waterTable: agriIntel?.waterTableDepth || 'Unknown',
-                    scientificNote: agriIntel?.scientificNote || 'Scientific profiling complete for your region.'
-                };
+            const freshDetailed = {
+                locationName: realData.name || 'Current Location',
+                temp: Math.round(realData.main.temp),
+                condition: realData.weather[0].main,
+                feelsLike: Math.round(realData.main.feels_like),
+                minTemp: Math.round(realData.main.temp_min),
+                maxTemp: Math.round(realData.main.temp_max),
+                humidity: realData.main.humidity,
+                windSpeed: Math.round(realData.wind.speed * 3.6),
+                windDirection: 'North-East',
+                windDeg: realData.wind.deg || 0,
+                pressure: realData.main.pressure,
+                visibility: Math.round(realData.visibility / 1000),
+                uvIndex: 6,
+                aqi: 42,
+                precipProb: (realData.clouds?.all || 0) + '%',
+                // Mix in Agricultural Intelligence
+                soilType: agriIntel?.soilType || 'Detecting...',
+                soilPH: agriIntel?.soilPH || 7.0,
+                soilMoisture: agriIntel?.soilMoistureEstimate || 45,
+                soilTemp: Math.round(realData.main.temp - 2), // Estimation
+                waterTable: agriIntel?.waterTableDepth || 'Unknown',
+                scientificNote: agriIntel?.scientificNote || 'Scientific profiling complete for your region.'
+            };
 
-                setWeatherData(prev => ({ ...prev, ...freshDetailed }));
-                console.log("✅ [Weather] Sync complete with real-time data");
+            setWeatherData(prev => ({ ...prev, ...freshDetailed }));
+            console.log(`✅ [Weather] Sync complete for ${realData.name}`);
 
-                const forecastData = generateForecastData(15).map(d => ({
-                    ...d,
-                    location: 'Current Location',
-                    detailed: freshDetailed
-                }));
-                await manager.saveWeatherData(forecastData);
-            } else {
-                throw new Error("Weather service returned no data");
-            }
+            const forecastData = generateForecastData(15).map(d => ({
+                ...d,
+                location: realData.name || 'Current Location',
+                detailed: freshDetailed
+            }));
+            await manager.saveWeatherData(forecastData);
+
         } catch (e) {
             console.error("❌ [Weather] Sync failed:", e.message);
             const errorMsg = e.code === 1 ? "Location permission denied" : e.message;
-            alert(`Weather Sync Failed: ${errorMsg}. Please ensure GPS is on and try again.`);
+            alert(`Weather Sync Failed: ${errorMsg}`);
 
             const freshData = generateForecastData(15).map(d => ({ ...d, location: 'Current Location' }));
             await manager.saveWeatherData(freshData);
@@ -210,13 +226,33 @@ const WeatherPage = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-4xl font-black text-nature-900 flex items-center gap-3">
-                        Environmental Intelligence <span className="text-3xl">📡</span>
+                        {weatherData.locationName} <span className="text-3xl">📡</span>
                     </h1>
-                    <p className="text-gray-600 font-bold">Real-time telemetry and atmospheric monitoring for your farm</p>
+                    <p className="text-gray-600 font-bold">Real-time telemetry for your region</p>
                 </div>
-                <div className="flex items-center gap-2 px-6 py-3 bg-nature-900 text-white rounded-2xl shadow-xl">
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    <span className="text-sm font-black uppercase tracking-widest">Live Sensor Data</span>
+
+                <div className="flex flex-wrap items-center gap-3">
+                    <div className="relative group">
+                        <input
+                            type="text"
+                            placeholder="Search City (e.g. Zaheerabad)"
+                            className="bg-white border-2 border-gray-100 rounded-2xl px-6 py-3 pr-12 font-bold text-gray-900 focus:outline-none focus:border-nature-500 transition-all w-64 shadow-sm"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSync(searchQuery)}
+                        />
+                        <button
+                            onClick={() => handleSync(searchQuery)}
+                            className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-gray-50 rounded-xl transition-colors"
+                        >
+                            <Sun className="h-5 w-5 text-nature-700" />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 px-6 py-3 bg-nature-900 text-white rounded-2xl shadow-xl">
+                        <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                        <span className="text-sm font-black uppercase tracking-widest">Live Sensor Data</span>
+                    </div>
                 </div>
             </div>
 

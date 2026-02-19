@@ -733,11 +733,11 @@ app.post('/api/posts/:id/like', authenticateToken, async (req, res) => {
     }
 });
 
-// 5. Weather Proxy with Key Rotation
+// 5. Weather Proxy with Key Rotation (Supports lat/lon or city name)
 app.get('/api/weather', async (req, res) => {
     try {
-        const { lat, lon } = req.query;
-        console.log(`🌤️ Weather Request: lat=${lat}, lon=${lon}`);
+        const { lat, lon, q } = req.query;
+        console.log(`🌤️ Weather Request: ${q ? `city=${q}` : `lat=${lat}, lon=${lon}`}`);
 
         const keys = [process.env.WEATHER_API_KEY, process.env.WEATHER_API_KEY_BACKUP].filter(Boolean);
         if (keys.length === 0) return res.status(500).json({ error: 'Missing Weather Keys' });
@@ -745,13 +745,16 @@ app.get('/api/weather', async (req, res) => {
         let lastError;
         for (const key of keys) {
             try {
-                const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${key}&units=metric`;
+                const url = q
+                    ? `https://api.openweathermap.org/data/2.5/weather?q=${q}&appid=${key}&units=metric`
+                    : `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${key}&units=metric`;
+
                 const response = await axios.get(url, { timeout: 8000 });
-                console.log("✅ Weather API Success (Key Rotation)");
+                console.log(`✅ Weather API Success: ${response.data.name} (${response.data.coord?.lat}, ${response.data.coord?.lon})`);
                 return res.json(response.data);
             } catch (e) {
                 lastError = e;
-                console.warn(`⚠️ Weather Key failed, trying next...`);
+                console.warn(`⚠️ Weather Key failed for ${q || 'coords'}, trying next...`);
             }
         }
         throw lastError;
@@ -763,8 +766,8 @@ app.get('/api/weather', async (req, res) => {
 
 app.get('/api/weather/forecast', async (req, res) => {
     try {
-        const { lat, lon } = req.query;
-        console.log(`📅 Forecast Request: lat=${lat}, lon=${lon}`);
+        const { lat, lon, q } = req.query;
+        console.log(`📅 Forecast Request: ${q ? `city=${q}` : `lat=${lat}, lon=${lon}`}`);
 
         const keys = [process.env.WEATHER_API_KEY, process.env.WEATHER_API_KEY_BACKUP].filter(Boolean);
         if (keys.length === 0) return res.status(500).json({ error: 'Missing Weather Keys' });
@@ -772,13 +775,15 @@ app.get('/api/weather/forecast', async (req, res) => {
         let lastError;
         for (const key of keys) {
             try {
-                const url = `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${key}&units=metric`;
+                const url = q
+                    ? `https://api.openweathermap.org/data/2.5/forecast?q=${q}&appid=${key}&units=metric`
+                    : `https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${key}&units=metric`;
+
                 const response = await axios.get(url, { timeout: 8000 });
-                console.log("✅ Forecast API Success (Key Rotation)");
                 return res.json(response.data);
             } catch (e) {
                 lastError = e;
-                console.warn(`⚠️ Forecast Key failed, trying next...`);
+                console.warn(`⚠️ Forecast Key failed for ${q || 'coords'}, trying next...`);
             }
         }
         throw lastError;
