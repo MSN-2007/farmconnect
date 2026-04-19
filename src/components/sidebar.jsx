@@ -20,11 +20,12 @@ import {
     Settings,
     LogOut,
     Sparkles,
-    Download
+    Download,
+    X
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, setIsOpen }) => {
     const location = useLocation();
 
     // Organized menu sections
@@ -74,10 +75,13 @@ const Sidebar = () => {
     ];
 
     return (
-        <div className="h-screen w-64 bg-white border-r border-gray-200 flex flex-col fixed left-0 top-0 overflow-y-auto">
-            {/* Logo */}
-            <div className="p-6 border-b border-gray-200">
-                <Link to="/" className="flex items-center gap-3 group">
+        <div className={cn(
+            "h-screen w-64 bg-white border-r border-gray-200 flex flex-col fixed left-0 top-0 overflow-y-auto z-50 transition-transform duration-300 lg:translate-x-0",
+            isOpen ? "translate-x-0" : "-translate-x-full"
+        )}>
+            {/* Logo & Mobile Close */}
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <Link to="/" className="flex items-center gap-3 group" onClick={() => setIsOpen(false)}>
                     <div className="h-10 w-10 bg-gradient-to-br from-nature-600 to-green-600 rounded-xl flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
                         <Sparkles className="h-6 w-6 text-white" />
                     </div>
@@ -86,6 +90,14 @@ const Sidebar = () => {
                         <p className="text-xs text-gray-500">Digital Farming</p>
                     </div>
                 </Link>
+                
+                {/* Mobile Close Button */}
+                <button 
+                    onClick={() => setIsOpen(false)}
+                    className="p-2 hover:bg-gray-100 rounded-lg lg:hidden"
+                >
+                    <X className="h-5 w-5 text-gray-500" />
+                </button>
             </div>
 
             {/* Navigation */}
@@ -102,6 +114,7 @@ const Sidebar = () => {
                                     <Link
                                         key={item.path}
                                         to={item.path}
+                                        onClick={() => setIsOpen(false)}
                                         className={cn(
                                             "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group relative",
                                             isActive

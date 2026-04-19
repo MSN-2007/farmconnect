@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Search, Bell, User, ChevronDown, MessageSquare, HelpCircle } from 'lucide-react';
+import { Search, Bell, User, ChevronDown, MessageSquare, HelpCircle, Menu } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 import { useAuth } from '../context/auth-context';
 import { useNavigate } from 'react-router-dom';
 
-const Topbar = () => {
+const Topbar = ({ onToggleSidebar }) => {
     const { user, logout } = useAuth();
     const navigate = useNavigate();
     const [showNotifications, setShowNotifications] = useState(false);
@@ -25,9 +25,16 @@ const Topbar = () => {
     const unreadCount = notifications.filter(n => n.unread).length;
 
     return (
-        <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-40">
-            {/* Search Bar */}
-            <div className="flex-1 max-w-2xl">
+        <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 sticky top-0 z-40">
+            {/* Mobile Menu Button */}
+            <button
+                onClick={onToggleSidebar}
+                className="p-2 mr-2 hover:bg-gray-100 rounded-lg transition-colors lg:hidden"
+            >
+                <Menu className="h-6 w-6 text-gray-600" />
+            </button>
+            {/* Search Bar - Hidden on small mobile */}
+            <div className="flex-1 max-w-2xl hidden sm:block">
                 <div className="relative">
                     <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                     <input

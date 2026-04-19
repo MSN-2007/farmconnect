@@ -125,8 +125,8 @@ const HomePage = () => {
                     </div>
                 </div>
 
-                <div className="w-full overflow-x-auto">
-                    <svg width={width} height={height} className="mx-auto">
+                <div className="w-full overflow-x-auto pb-4">
+                    <svg width={width} height={height} className="mx-auto min-w-[600px]">
                         {/* Grid lines */}
                         {[0, 1, 2, 3, 4].map(i => {
                             const y = padding + (i * (height - 2 * padding) / 4);
@@ -204,10 +204,10 @@ const HomePage = () => {
                     </svg>
                 </div>
 
-                {/* Weather details */}
-                <div className="grid grid-cols-7 gap-2 mt-4">
+                {/* Weather details - Scrollable on mobile */}
+                <div className="grid grid-cols-4 md:grid-cols-7 gap-2 mt-4 overflow-x-auto pb-2">
                     {weatherData.map((d, i) => (
-                        <div key={i} className="text-center p-2 bg-gray-50 rounded-lg">
+                        <div key={i} className="text-center p-2 bg-gray-50 rounded-lg min-w-[70px]">
                             <div className="text-xs text-gray-600 mb-1">{d.day}</div>
                             <div className="flex flex-col gap-1">
                                 <div className="flex items-center justify-center gap-1 text-xs">

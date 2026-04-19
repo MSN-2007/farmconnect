@@ -33,11 +33,14 @@ const PageLoader = () => (
 
 const router = createBrowserRouter([
   {
+    path: '/login',
+    element: <Suspense fallback={<PageLoader />}><LoginPage /></Suspense>
+  },
+  {
     path: '/',
     element: <RootLayout />,
     children: [
       { index: true, element: <Suspense fallback={<PageLoader />}><HomePage /></Suspense> },
-      { path: 'login', element: <Suspense fallback={<PageLoader />}><LoginPage /></Suspense> },
       { path: 'market-prices', element: <Suspense fallback={<PageLoader />}><MarketPricesPage /></Suspense> },
       { path: 'community', element: <Suspense fallback={<PageLoader />}><CommunityPage /></Suspense> },
       { path: 'buy-sell', element: <Suspense fallback={<PageLoader />}><BuySellPage /></Suspense> },
