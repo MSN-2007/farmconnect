@@ -56,8 +56,9 @@ const HomePage = () => {
                 const lon = 77.2090;
 
                 const data = await smartFetch('forecast', { lat, lon });
-
-                if (data.list) {
+                
+                // ✅ FIX: Added safety check for data
+                if (data && data.list) {
                     // Process 5-day forecast (3-hour intervals) into daily summary
                     const dailyData = data.list.filter(item => item.dt_txt.includes('12:00:00')).map(item => {
                         return {
@@ -81,8 +82,19 @@ const HomePage = () => {
 
     // Weather Graph Component
     const WeatherGraph = () => {
-        const maxTemp = Math.max(...weatherData.map(d => d.temp));
-        const maxRain = Math.max(...weatherData.map(d => d.rainfall));
+        // ✅ FIX: Heavy protection against empty or invalid data
+        if (!weatherData || weatherData.length === 0) {
+            return (
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-12 text-center">
+                    <Cloud className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500 font-medium">Weather Forecast Data Unavailable</p>
+                    <p className="text-gray-400 text-sm mt-1">Please check your internet connection or try again later.</p>
+                </div>
+            );
+        }
+
+        const maxTemp = Math.max(...weatherData.map(d => d.temp)) || 40;
+        const maxRain = Math.max(...weatherData.map(d => d.rainfall)) || 10;
         const width = 700;
         const height = 200;
         const padding = 40;

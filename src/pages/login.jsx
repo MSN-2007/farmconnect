@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/auth-context';
-import { Phone, ArrowRight, ShieldCheck, Sprout, User } from 'lucide-react';
+import { Phone, ArrowRight, ShieldCheck, Sprout, User, Sparkles } from 'lucide-react';
 
 const LoginPage = () => {
     const navigate = useNavigate();
-    const { login, register } = useAuth();
+    const { login, register, loginDemo } = useAuth();
 
     const [isLogin, setIsLogin] = useState(true);
     const [loading, setLoading] = useState(false);
@@ -146,6 +146,26 @@ const LoginPage = () => {
                             {loading ? 'Processing...' : (isLogin ? 'Login Securely' : 'Create Account')}
                             {!loading && <ArrowRight className="h-5 w-5" />}
                         </button>
+
+                        {/* ✅ FIX: Added Demo Mode button for showcase/testing */}
+                        {isLogin && (
+                            <div className="pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        loginDemo();
+                                        navigate('/');
+                                    }}
+                                    className="w-full py-4 bg-amber-50 text-amber-700 border-2 border-amber-200 rounded-2xl font-black text-lg hover:bg-amber-100 transition-all flex items-center justify-center gap-2"
+                                >
+                                    <Sparkles className="h-5 w-5" />
+                                    Try Demo Mode (Bypass DB)
+                                </button>
+                                <p className="text-[10px] text-center text-amber-500 mt-2 font-bold uppercase tracking-widest">
+                                    No database required • Instant access
+                                </p>
+                            </div>
+                        )}
                     </form>
 
                     <div className="mt-6 text-center">

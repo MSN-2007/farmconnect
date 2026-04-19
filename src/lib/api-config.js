@@ -129,7 +129,7 @@ export const smartFetch = async (service, params = {}) => {
         return data;
     } catch (error) {
         console.error(`❌ Proxy Request Failed (${service}):`, error.message);
-        return null;
+        return { error: error.message }; // ✅ FIX: Return error object instead of null to prevent white-screen crashes
     }
 };
 

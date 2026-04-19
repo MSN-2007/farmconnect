@@ -83,9 +83,10 @@ app.use(helmet({
             styleSrc: ["'self'", "'unsafe-inline'"],
             scriptSrc: ["'self'"],
             imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
+            connectSrc: ["'self'", "http://localhost:3001", "http://localhost:3000", "ws://localhost:3001", "https://*.googleapis.com"],
         },
     },
-})); // Secure HTTP headers with CSP
+})); // ✅ FIX: Added connectSrc to allow API calls to backend & external services
 
 // General Rate Limiting (100 requests per 15 mins)
 const limiter = rateLimit({

@@ -106,11 +106,25 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const loginDemo = () => {
+        const demoUser = {
+            id: 'demo-123',
+            name: 'Demo Farmer',
+            phone: '9999999999',
+            role: 'farmer'
+        };
+        setUser(demoUser);
+        setToken('demo-token');
+        return true;
+    };
+
     const isDeveloper = () => user?.role === 'developer';
-    const isFarmer = () => user?.role === 'farmer';
+    const isFarmer = () => user?.role === 'farmer' || user?.id === 'demo-123';
 
     return (
-        <AuthContext.Provider value={{ user, token, loading, login, register, loginDeveloper, logout, isDeveloper, isFarmer }}>
+        <AuthContext.Provider value={{ 
+            user, token, loading, login, register, loginDeveloper, loginDemo, logout, isDeveloper, isFarmer 
+        }}>
             {!loading && children}
         </AuthContext.Provider>
     );
