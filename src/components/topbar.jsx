@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Bell, User, ChevronDown, MessageSquare, HelpCircle, Menu } from 'lucide-react';
+import { Search, Bell, User, ChevronDown, MessageSquare, HelpCircle, Menu, Sparkles } from 'lucide-react';
 import { cn } from '../lib/utils';
 
 import { useAuth } from '../context/auth-context';
@@ -26,13 +26,21 @@ const Topbar = ({ onToggleSidebar }) => {
 
     return (
         <div className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 sticky top-0 z-40">
-            {/* Mobile Menu Button */}
-            <button
-                onClick={onToggleSidebar}
-                className="p-2 mr-2 hover:bg-gray-100 rounded-lg transition-colors lg:hidden"
-            >
-                <Menu className="h-6 w-6 text-gray-600" />
-            </button>
+            {/* Mobile Menu Button & Brand */}
+            <div className="flex items-center gap-1 lg:hidden">
+                <button
+                    onClick={onToggleSidebar}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors outline-none"
+                    aria-label="Toggle Menu"
+                >
+                    <Menu className="h-6 w-6 text-gray-600" />
+                </button>
+                <div className="flex items-center gap-2 ml-1">
+                    <div className="h-8 w-8 bg-nature-600 rounded-lg flex items-center justify-center shadow-sm">
+                        <Sparkles className="h-5 w-5 text-white" />
+                    </div>
+                </div>
+            </div>
             {/* Search Bar - Hidden on small mobile */}
             <div className="flex-1 max-w-2xl hidden sm:block">
                 <div className="relative">

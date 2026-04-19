@@ -252,8 +252,8 @@ const AnalyticsPage = () => {
                 </div>
             </div>
 
-            {/* Tabs */}
-            <div className="bg-gray-100 rounded-xl p-1 mb-6 flex gap-1">
+            {/* Tabs - Scrollable on mobile */}
+            <div className="bg-gray-100 rounded-xl p-1 mb-6 flex gap-1 overflow-x-auto no-scrollbar whitespace-nowrap">
                 {tabs.map((tab) => (
                     <button
                         key={tab}
@@ -282,9 +282,9 @@ const AnalyticsPage = () => {
                                 <p className="text-sm">Add metrics to see your income trends</p>
                             </div>
                         ) : (
-                            <div className="space-y-4">
+                            <div className="space-y-4 overflow-x-auto pb-4 custom-scrollbar">
                                 {/* Simple Bar Chart */}
-                                <div className="h-64 flex items-end gap-4 border-b border-l border-gray-200 pb-2 pl-2">
+                                <div className="h-64 flex items-end gap-4 border-b border-l border-gray-200 pb-2 pl-2 min-w-[500px]">
                                     {getIncomeOverTime().map((data, index) => {
                                         const maxIncome = Math.max(...getIncomeOverTime().map(d => d.income));
                                         const height = (data.income / maxIncome) * 100;
@@ -353,9 +353,9 @@ const AnalyticsPage = () => {
                                 <p className="text-sm">Add metrics to see your crop yields</p>
                             </div>
                         ) : (
-                            <div className="space-y-4">
+                            <div className="space-y-4 overflow-x-auto pb-4 custom-scrollbar">
                                 {/* Bar Chart for Yields */}
-                                <div className="h-64 flex items-end gap-4 border-b border-l border-gray-200 pb-2 pl-2">
+                                <div className="h-64 flex items-end gap-4 border-b border-l border-gray-200 pb-2 pl-2 min-w-[400px]">
                                     {getCropYields().map((data, index) => {
                                         const maxYield = Math.max(...getCropYields().map(d => d.yieldAmount));
                                         const height = (data.yieldAmount / maxYield) * 100;

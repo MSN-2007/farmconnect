@@ -11,14 +11,14 @@ const RootLayout = () => {
     const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
 
     return (
-        <div className="flex h-screen bg-earth-50 overflow-hidden">
-            {/* Sidebar - Drawer on Mobile, Fixed on Desktop (lg: 1024px) */}
+        <div className="min-h-screen bg-earth-50 relative lg:pl-64 transition-all duration-300">
+            {/* Sidebar - Drawer on Mobile, Fixed on Desktop */}
             <Sidebar isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
-            {/* Main Content - Dynamic margin based on sidebar state and screen size */}
-            <div className="flex-1 flex flex-col overflow-hidden lg:ml-64">
+            {/* Main Content Area */}
+            <div className="flex flex-col min-h-screen relative overflow-hidden">
                 <Topbar onToggleSidebar={toggleSidebar} />
-                <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-24">
+                <main className="flex-1 p-4 md:p-6 pb-24">
                     <Outlet />
                 </main>
             </div>
