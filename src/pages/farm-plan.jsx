@@ -16,7 +16,8 @@ const FarmPlanPage = () => {
             const saved = await manager.getPendingSync();
             const planActivities = saved.filter(i => i.type === 'farm_plan');
             if (planActivities.length > 0) {
-                setActivities(planActivities.map(i => i.data));
+                // Ensure we get the raw activity object
+                setActivities(planActivities.map(i => i.data.data || i.data));
             } else {
                 // Default mock data if empty
                 setActivities([
@@ -81,8 +82,14 @@ const FarmPlanPage = () => {
     ];
 
     const upcomingActivities = activities.filter(a => a.status === 'Upcoming').length;
-    const totalPlannedCost = activities.reduce((sum, a) => sum + Number(a.cost), 0);
-    const totalSpent = activities.filter(a => a.status === 'Completed').reduce((sum, a) => sum + Number(a.cost), 0);
+    const totalPlannedCost = activities.reduce((sum, a) => {
+        const cost = Number(a.cost);
+        return sum + (isNaN(cost) ? 0 : cost);
+    }, 0);
+    const totalSpent = activities.filter(a => a.status === 'Completed').reduce((sum, a) => {
+        const cost = Number(a.cost);
+        return sum + (isNaN(cost) ? 0 : cost);
+    }, 0);
 
     const handleAddActivity = async (e) => {
         e.preventDefault();

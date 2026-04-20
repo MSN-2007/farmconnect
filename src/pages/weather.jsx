@@ -40,6 +40,8 @@ const WeatherPage = () => {
         scientificNote: 'Awaiting local sync...'
     });
     const [searchQuery, setSearchQuery] = useState('');
+    const [forecastData, setForecastData] = useState([]);
+    const [activeMetric, setActiveMetric] = useState('temp');
 
     useEffect(() => {
         const syncWeather = async () => {
@@ -47,8 +49,11 @@ const WeatherPage = () => {
             const cached = await manager.getWeatherData('Current Location');
             if (cached && cached.length > 0) {
                 setLastSynced(new Date(cached[0].cachedAt).toLocaleString());
-                // If we have detailed data in cache, use it
+                setForecastData(cached);
                 if (cached[0].detailed) setWeatherData(cached[0].detailed);
+            } else {
+                // Initial fallback
+                setForecastData(generateForecastData(7));
             }
         };
         syncWeather();
@@ -86,7 +91,18 @@ const WeatherPage = () => {
                 units: 'metric'
             });
 
-            if (!realData) throw new Error("Weather service returned no data");
+            if (!realData || realData.error) throw new Error(realData.error || "Weather service returned no data");
+
+            // 2.5 Fetch REAL 5-Day Forecast
+            console.log("📅 [Weather] Fetching 5-day predictive forecast...");
+            const realForecast = await smartFetch('weather', {
+                ...queryParams,
+                forecast: true,
+                units: 'metric'
+            }).catch(err => {
+                console.warn("⚠️ Forecast fetch failed, using generated fallback:", err);
+                return null;
+            });
 
             // 3. Fetch Agricultural Intelligence (Soil/Water)
             // Use coords from weather response (more accurate for city search)
@@ -130,12 +146,35 @@ const WeatherPage = () => {
             setWeatherData(prev => ({ ...prev, ...freshDetailed }));
             console.log(`✅ [Weather] Sync complete for ${realData.name}`);
 
-            const forecastData = generateForecastData(15).map(d => ({
-                ...d,
-                location: realData.name || 'Current Location',
-                detailed: freshDetailed
-            }));
-            await manager.saveWeatherData(forecastData);
+            let forecastToSave;
+            if (realForecast && realForecast.list) {
+                // Map OpenWeather 5-day / 3-hour forecast to our daily format
+                const dailyMap = {};
+                realForecast.list.forEach(item => {
+                    const date = new Date(item.dt * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    if (!dailyMap[date]) {
+                        dailyMap[date] = {
+                            date,
+                            temp: Math.round(item.main.temp),
+                            rainfall: item.rain ? item.rain['3h'] || 0 : 0,
+                            humidity: item.main.humidity,
+                            wind: Math.round(item.wind.speed * 3.6),
+                            location: realData.name || 'Current Location',
+                            detailed: freshDetailed
+                        };
+                    }
+                });
+                forecastToSave = Object.values(dailyMap);
+            } else {
+                forecastToSave = generateForecastData(15).map(d => ({
+                    ...d,
+                    location: realData.name || 'Current Location',
+                    detailed: freshDetailed
+                }));
+            }
+
+            setForecastData(forecastToSave);
+            await manager.saveWeatherData(forecastToSave);
 
         } catch (e) {
             console.error("❌ [Weather] Sync failed:", e.message);
@@ -218,7 +257,22 @@ const WeatherPage = () => {
         }
     };
 
-    const forecastData = generateForecastData(getForecastDays());
+    const getForecastSlice = () => {
+        const days = getForecastDays();
+        return forecastData.slice(0, days);
+    };
+
+    const currentForecast = getForecastSlice();
+
+    const getMetricLabel = () => {
+        switch (activeMetric) {
+            case 'temp': return 'Temperature (°C)';
+            case 'rainfall': return 'Rainfall (mm)';
+            case 'wind': return 'Wind (km/h)';
+            case 'humidity': return 'Humidity (%)';
+            default: return 'Value';
+        }
+    };
 
     return (
         <div className="max-w-7xl mx-auto py-8 space-y-8 animate-in fade-in duration-700">
@@ -466,66 +520,94 @@ const WeatherPage = () => {
                         <h2 className="text-3xl font-black text-gray-900">Predictive Analytics</h2>
                         <p className="text-gray-500 font-bold">Long-range temperature & precipitation forecasting</p>
                     </div>
-                    <div className="flex bg-gray-50 p-2 rounded-2xl overflow-x-auto gap-2">
-                        {['7 Days', '15 Days', '30 Days', '90 Days'].map((range) => (
-                            <button
-                                key={range}
-                                onClick={() => setForecastRange(range)}
-                                className={cn(
-                                    "px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                                    forecastRange === range
-                                        ? "bg-nature-900 text-white shadow-lg"
-                                        : "text-gray-400 hover:text-gray-600 hover:bg-white"
-                                )}
-                            >
-                                {range}
-                            </button>
-                        ))}
+                    <div className="flex flex-col gap-4">
+                        <div className="flex bg-gray-50 p-2 rounded-2xl overflow-x-auto gap-2">
+                            {['7 Days', '15 Days', '30 Days', '90 Days'].map((range) => (
+                                <button
+                                    key={range}
+                                    onClick={() => setForecastRange(range)}
+                                    className={cn(
+                                        "px-6 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
+                                        forecastRange === range
+                                            ? "bg-nature-900 text-white shadow-lg"
+                                            : "text-gray-400 hover:text-gray-600 hover:bg-white"
+                                    )}
+                                >
+                                    {range}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex bg-nature-50 p-2 rounded-2xl overflow-x-auto gap-2 self-end">
+                            {[
+                                { id: 'temp', label: 'Temp', icon: Thermometer },
+                                { id: 'rainfall', label: 'Rain', icon: CloudRain },
+                                { id: 'wind', label: 'Wind', icon: Wind },
+                                { id: 'humidity', label: 'Humid', icon: Droplets }
+                            ].map((m) => (
+                                <button
+                                    key={m.id}
+                                    onClick={() => setActiveMetric(m.id)}
+                                    className={cn(
+                                        "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2",
+                                        activeMetric === m.id
+                                            ? "bg-nature-800 text-white shadow-md"
+                                            : "text-nature-600 hover:bg-white"
+                                    )}
+                                >
+                                    <m.icon className="h-3 w-3" /> {m.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
                 {/* Chart Visualization */}
                 <div className="relative bg-gray-50 rounded-[32px] p-10 overflow-hidden">
                     <div className="h-80 overflow-x-auto custom-scrollbar flex items-end justify-around gap-4 px-8">
-                        {forecastData.map((data, index) => (
-                            <div
-                                key={index}
-                                className="relative flex-1 min-w-[50px] group flex flex-col items-center gap-4"
-                                onMouseEnter={() => setHoveredBar(index)}
-                                onMouseLeave={() => setHoveredBar(null)}
-                            >
-                                {/* Tooltip */}
-                                {hoveredBar === index && (
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 bg-nature-900 text-white text-[10px] font-bold rounded-2xl px-4 py-3 whitespace-nowrap z-30 shadow-2xl animate-in zoom-in-50 duration-200">
-                                        <div className="text-nature-400 mb-1">{data.date}</div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <div className="w-2 h-2 bg-indigo-400 rounded-full"></div>
-                                            Temp: {data.temp}°C
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 bg-amber-400 rounded-full"></div>
-                                            Rain: {data.rainfall}mm
-                                        </div>
-                                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[8px] border-transparent border-t-nature-900"></div>
-                                    </div>
-                                )}
+                        {currentForecast.map((data, index) => {
+                            const val = data[activeMetric] || 0;
+                            const max = activeMetric === 'temp' ? 45 : activeMetric === 'rainfall' ? 30 : activeMetric === 'wind' ? 40 : 100;
+                            const percentage = Math.min((val / max) * 100, 100);
 
-                                {/* Bars */}
-                                <div className="flex items-end gap-1 h-48 w-full justify-center">
-                                    <div
-                                        className="w-3 rounded-full bg-gradient-to-t from-indigo-500 to-indigo-400 opacity-60 group-hover:opacity-100 transition-all duration-300"
-                                        style={{ height: `${(data.temp / 40) * 100}%` }}
-                                    ></div>
-                                    <div
-                                        className="w-3 rounded-full bg-gradient-to-t from-amber-500 to-amber-400 opacity-40 group-hover:opacity-100 transition-all duration-300"
-                                        style={{ height: `${(data.rainfall / 20) * 100}%` }}
-                                    ></div>
+                            return (
+                                <div
+                                    key={index}
+                                    className="relative flex-1 min-w-[60px] group flex flex-col items-center gap-4"
+                                    onMouseEnter={() => setHoveredBar(index)}
+                                    onMouseLeave={() => setHoveredBar(null)}
+                                >
+                                    {/* Tooltip */}
+                                    {hoveredBar === index && (
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-4 bg-nature-900 text-white text-[10px] font-bold rounded-2xl px-4 py-3 whitespace-nowrap z-30 shadow-2xl animate-in zoom-in-50 duration-200">
+                                            <div className="text-nature-400 mb-1">{data.date}</div>
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <div className="w-2 h-2 bg-indigo-400 rounded-full"></div>
+                                                {getMetricLabel()}: {val}{activeMetric === 'temp' ? '°C' : activeMetric === 'rainfall' ? 'mm' : activeMetric === 'wind' ? 'km/h' : '%'}
+                                            </div>
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 border-[8px] border-transparent border-t-nature-900"></div>
+                                        </div>
+                                    )}
+
+                                    {/* Bar with dynamic color based on metric */}
+                                    <div className="flex items-end h-48 w-full justify-center">
+                                        <div
+                                            className={cn(
+                                                "w-4 rounded-full transition-all duration-500 shadow-sm group-hover:shadow-md",
+                                                activeMetric === 'temp' ? "bg-gradient-to-t from-orange-500 to-amber-400" :
+                                                    activeMetric === 'rainfall' ? "bg-gradient-to-t from-blue-600 to-blue-400" :
+                                                        activeMetric === 'wind' ? "bg-gradient-to-t from-teal-500 to-emerald-400" :
+                                                            "bg-gradient-to-t from-indigo-500 to-purple-400"
+                                            )}
+                                            style={{ height: `${percentage}%` }}
+                                        ></div>
+                                    </div>
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter truncate w-full text-center">
+                                        {data.date}
+                                    </span>
                                 </div>
-                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-tighter truncate w-full text-center">
-                                    {data.date}
-                                </span>
-                            </div>
-                        ))}
+                            );
+                        })}
+                    </div>
                     </div>
 
                     {/* Chart Legend */}

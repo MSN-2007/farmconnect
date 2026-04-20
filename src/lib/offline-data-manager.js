@@ -188,6 +188,7 @@ class OfflineDataManager {
 
     // Save user data for offline access
     async saveUserData(type, data) {
+        if (!this.db) await this.init();
         const transaction = this.db.transaction(['userData'], 'readwrite');
         const store = transaction.objectStore('userData');
 
@@ -203,6 +204,7 @@ class OfflineDataManager {
 
     // Get pending user data to sync
     async getPendingSync() {
+        if (!this.db) await this.init();
         const transaction = this.db.transaction(['userData'], 'readonly');
         const store = transaction.objectStore('userData');
 

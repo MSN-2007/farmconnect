@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Video, MessageSquare, Calendar, Pill, Star, X } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { smartFetch } from '../lib/api-config';
 
 const VetPage = () => {
     const [activeTab, setActiveTab] = useState('Experts');
@@ -17,10 +18,9 @@ const VetPage = () => {
 
     useEffect(() => {
         const fetchExperts = async () => {
-            const { smartFetch } = await import('../lib/api-config');
             try {
                 const data = await smartFetch('experts');
-                if (data) setExperts(data);
+                if (data && !data.error) setExperts(data);
             } catch (err) {
                 console.error("Failed to fetch experts:", err);
             } finally {

@@ -13,9 +13,9 @@ const AIAssistantPage = () => {
         {
             id: 1,
             type: 'ai',
-            text: 'Namaste! I am your Advanced Farming Assistant. I am currently connected to multiple AI models (Gemini, GPT-4, Llama-3) with automatic failover support. \n\nHow can I empower your farm today?',
+            text: 'Namaste! I am Kisan AI Pro, your Advanced Agricultural Agronomist. I am currently connected to multiple state-of-the-art AI models with automatic failover support. \n\nHow can I empower your farm today?',
             timestamp: new Date(),
-            sender: 'Kisan AI (Multi-Key Active)'
+            sender: 'Kisan AI Pro'
         }
     ]);
     const [inputText, setInputText] = useState('');
@@ -122,9 +122,9 @@ const AIAssistantPage = () => {
             const aiMsg = {
                 id: Date.now() + 1,
                 type: 'ai',
-                text: responseText,
+                text: responseText || "I'm experiencing a temporary connectivity issue with my core knowledge base. Please try again in a moment.",
                 timestamp: new Date(),
-                sender: 'Kisan AI (Gateway Mode)'
+                sender: 'Kisan AI Pro'
             };
             setMessages(prev => [...prev, aiMsg]);
 
