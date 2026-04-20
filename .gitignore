@@ -22,6 +22,7 @@ dist-ssr
 *.env
 secrets/
 .secrets
+RENDER_ENV_VARS.txt
 
 # Editor directories and files
 .vscode/*
@@ -33,4 +34,3 @@ secrets/
 *.njsproj
 *.sln
 *.sw?
-
