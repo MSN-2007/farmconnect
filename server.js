@@ -164,7 +164,7 @@ app.get('/api/csrf-token', (req, res) => {
 
 // --- Configuration ---
 // 1. MongoDB Connection
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/farm-connect')
+mongoose.connect((process.env.MONGO_URI || 'mongodb://localhost:27017/farm-connect').trim())
     .then(() => console.log('✅ MongoDB Connected'))
     .catch(err => console.error('❌ MongoDB Error:', err));
 
