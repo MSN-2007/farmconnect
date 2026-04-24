@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Upload, AlertCircle, History, Download, X, Loader } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { smartFetch } from '../lib/api-config';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
@@ -68,15 +69,9 @@ const AILensPage = () => {
             // Remove data:image/jpeg;base64, prefix if present for API
             const base64Data = imageData.split(',')[1];
 
-            const response = await fetch(`${API_URL}/api/ai/analyze-image`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ imageBase64: base64Data })
-            });
+            const analysis = await smartFetch('analyze-image', { imageBase64: base64Data });
 
-            if (!response.ok) throw new Error('Analysis failed');
-
-            const analysis = await response.json();
+            if (analysis.error) throw new Error(analysis.error);
 
             // Transform API response to match UI structure if needed, 
             // but the server instructions asked for matching JSON.

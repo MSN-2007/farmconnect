@@ -30,12 +30,25 @@ export const AuthProvider = ({ children }) => {
         checkAuth();
     }, []);
 
+    const getCsrfToken = async () => {
+        try {
+            const res = await fetch(`${API_URL}/api/csrf-token`, { credentials: 'include' });
+            return (await res.json()).csrfToken;
+        } catch (e) {
+            return null;
+        }
+    };
+
     const login = async (phone, password) => {
         try {
+            const csrfToken = await getCsrfToken();
             const res = await fetch(`${API_URL}/api/auth/login`, {
                 method: 'POST',
-                credentials: 'include',  // Important: receive cookie
-                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
                 body: JSON.stringify({ phone, password })
             });
 
@@ -43,9 +56,7 @@ export const AuthProvider = ({ children }) => {
 
             const data = await res.json();
             setUser(data.user);
-            setToken(true); // Token is in cookie
-
-            // No longer using localStorage for tokens
+            setToken(true);
             return true;
         } catch (error) {
             console.error(error);
@@ -55,10 +66,14 @@ export const AuthProvider = ({ children }) => {
 
     const register = async (name, phone, password, role = 'farmer') => {
         try {
+            const csrfToken = await getCsrfToken();
             const res = await fetch(`${API_URL}/api/auth/register`, {
                 method: 'POST',
-                credentials: 'include',  // Important: receive cookie
-                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken
+                },
                 body: JSON.stringify({ name, phone, password, role })
             });
 
@@ -66,9 +81,7 @@ export const AuthProvider = ({ children }) => {
 
             const data = await res.json();
             setUser(data.user);
-            setToken(true); // Token is in cookie
-
-            // No longer using localStorage for tokens
+            setToken(true);
             return true;
         } catch (error) {
             console.error(error);
@@ -115,6 +128,7 @@ export const AuthProvider = ({ children }) => {
         };
         setUser(demoUser);
         setToken('demo-token');
+        localStorage.setItem('farmcon_demo_mode', 'true');
         return true;
     };
 

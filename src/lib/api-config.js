@@ -68,6 +68,10 @@ export const smartFetch = async (service, params = {}) => {
             'Accept': 'application/json'
         };
 
+        if (localStorage.getItem('farmcon_demo_mode') === 'true') {
+            headers['X-Demo-Mode'] = 'true';
+        }
+
         // Construct URL based on service
         if (service === 'weather') {
             const endpoint = params.forecast ? API_CONFIG.forecast.baseUrl : API_CONFIG.weather.baseUrl;
@@ -89,6 +93,11 @@ export const smartFetch = async (service, params = {}) => {
             url = `${BACKEND_URL}/api/agri-intelligence?${queryParams}`;
         } else if (service === 'experts') {
             url = `${BACKEND_URL}/api/experts`;
+        } else if (service === 'analyze-image') {
+            url = `${BACKEND_URL}/api/ai/analyze-image`;
+            method = 'POST';
+            body = JSON.stringify(params);
+            headers['Content-Type'] = 'application/json';
         } else {
             throw new Error(`Service ${service} not supported via proxy yet.`);
         }

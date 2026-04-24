@@ -21,18 +21,33 @@ const MarketPricesPage = () => {
     // 1. Get User Location & Reverse Geocode
     useEffect(() => {
         if (!navigator.geolocation) {
-            setStatus('error');
+            useFallbackLocation();
             return;
+        }
+
+        const timeoutId = setTimeout(() => {
+            console.warn("GPS Timeout - Using fallback");
+            useFallbackLocation();
+        }, 8000); // 8 second timeout
+
+        function useFallbackLocation() {
+            clearTimeout(timeoutId);
+            if (status === 'ready') return; // Don't override if already loaded
+            console.log("📍 Using fallback location: Zaheerabad");
+            setUserLocation({ lat: 17.65, lng: 77.61 });
+            setDistrict('Zaheerabad');
+            setState('Telangana');
+            fetchMarketData('Zaheerabad');
         }
 
         navigator.geolocation.getCurrentPosition(
             async (position) => {
+                clearTimeout(timeoutId);
                 const { latitude, longitude } = position.coords;
                 setUserLocation({ lat: latitude, lng: longitude });
                 setStatus('loading_data');
 
                 try {
-                    // Using BigDataCloud's free reverse geocoding API
                     const geoRes = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`);
                     const geoData = await geoRes.json();
 
@@ -43,20 +58,16 @@ const MarketPricesPage = () => {
                     setState(detectedState);
                     fetchMarketData(detectedDistrict);
                 } catch (e) {
-                    console.error("Geocoding failed", e);
-                    setDistrict('Ludhiana');
-                    setState('Punjab');
-                    fetchMarketData('Ludhiana');
+                    useFallbackLocation();
                 }
             },
             (err) => {
-                console.error("Location blocked", err);
-                setUserLocation({ lat: 17.65, lng: 77.61 }); // Zaheerabad fallback
-                setDistrict('Zaheerabad');
-                setState('Telangana');
-                fetchMarketData('Zaheerabad');
-            }
+                useFallbackLocation();
+            },
+            { timeout: 10000 }
         );
+
+        return () => clearTimeout(timeoutId);
     }, []);
 
     // 2. Fetch Market Data (Real or Proxy)

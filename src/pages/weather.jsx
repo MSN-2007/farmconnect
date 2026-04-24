@@ -620,7 +620,6 @@ const WeatherPage = () => {
                             <div className="w-3 h-3 bg-amber-500 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]"></div>
                             <span className="text-xs font-black text-gray-500 uppercase tracking-widest">Expected Precipitation</span>
                         </div>
-                    </div>
                 </div>
             </div>
 

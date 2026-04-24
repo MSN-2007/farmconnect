@@ -4,6 +4,7 @@ import App from './App.jsx'
 import './index.css'
 import { AuthProvider } from './context/auth-context';
 import { NotificationProvider } from './context/notification-context';
+import './lib/firebase'; // 🕵️ Initialize Firebase Analytics
 
 // Register Service Worker for PWA
 if ('serviceWorker' in navigator) {

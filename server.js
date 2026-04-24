@@ -80,13 +80,24 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            styleSrc: ["'self'", "'unsafe-inline'"],
-            scriptSrc: ["'self'"],
-            imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
-            connectSrc: ["'self'", "http://localhost:3001", "http://localhost:3000", "ws://localhost:3001", "https://*.googleapis.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "https://www.googletagmanager.com"],
+            imgSrc: ["'self'", "data:", "https://res.cloudinary.com", "https://*.googleapis.com"],
+            connectSrc: [
+                "'self'", 
+                "http://localhost:3001", 
+                "http://localhost:3000", 
+                "ws://localhost:3001", 
+                "https://*.googleapis.com", 
+                "https://*.firebaseio.com",
+                "https://*.google-analytics.com",
+                "https://*.vercel.app",
+                "https://*.onrender.com"
+            ],
+            fontSrc: ["'self'", "https://fonts.gstatic.com"],
         },
     },
-})); // ✅ FIX: Added connectSrc to allow API calls to backend & external services
+})); // ✅ FIX: Added production domains & Firebase to CSP
 
 // General Rate Limiting (100 requests per 15 mins)
 const limiter = rateLimit({
@@ -161,6 +172,15 @@ app.get('/api/csrf-token', (req, res) => {
     res.json({ csrfToken: req.csrfToken() });
 });
 
+// 🏥 Health Check (for Render/Vercel monitoring)
+app.get('/api/health', (req, res) => {
+    res.json({ 
+        status: 'ok', 
+        environment: process.env.NODE_ENV,
+        timestamp: new Date().toISOString() 
+    });
+});
+
 
 // --- Configuration ---
 // 1. MongoDB Connection
@@ -186,8 +206,14 @@ const upload = multer({ storage: storage });
 
 // --- Auth Middleware ---
 const authenticateToken = (req, res, next) => {
-    // Read token from httpOnly cookie instead of Authorization header
+    // Read token from httpOnly cookie
     const token = req.cookies.farmcon_token;
+
+    // 🔬 Development Bypass: Allow demo mode for testing UI without DB
+    if (!token && req.headers['x-demo-mode'] === 'true') {
+        req.user = { id: 'demo-123', role: 'farmer' };
+        return next();
+    }
 
     if (!token) return res.sendStatus(401);
 
@@ -280,7 +306,7 @@ app.post('/api/auth/register',
             res.cookie('farmcon_token', token, {
                 httpOnly: true,           // Prevents JavaScript access
                 secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-                sameSite: 'strict',       // CSRF protection
+                sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'strict', // 'lax' for production compatibility
                 maxAge: 7 * 24 * 60 * 60 * 1000  // 7 days
             });
 
@@ -348,7 +374,7 @@ app.post('/api/auth/login',
             res.cookie('farmcon_token', token, {
                 httpOnly: true,           // Prevents JavaScript access
                 secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-                sameSite: 'strict',       // CSRF protection
+                sameSite: process.env.NODE_ENV === 'production' ? 'lax' : 'strict', // 'lax' for production compatibility
                 maxAge: 7 * 24 * 60 * 60 * 1000  // 7 days
             });
 
@@ -411,7 +437,7 @@ app.post('/api/ai/analyze-image',
             const payload = {
                 contents: [{
                     parts: [
-                        { text: "Analyze this plant image. Identify: 1. Crop Name 2. Disease/Pest (if any) 3. Confidence Level 4. Treatment 5. Prevention. Return ONLY JSON format." },
+                        { text: "Analyze this agricultural plant image for 'Kisan AI Lens'. Identify: 1. Crop Name (Scientific & Common) 2. Disease/Pest (if none, state 'None') 3. Confidence Level (e.g. 95%) 4. Scientifically accurate Treatment 5. Prevention methods. If the image is not a plant or farm-related, return 'Invalid' for Crop Name. Return ONLY JSON format with these keys: 'Crop Name', 'Disease/Pest', 'Confidence Level', 'Treatment', 'Prevention'." },
                         { inline_data: { mime_type: "image/jpeg", data: imageBase64 } }
                     ]
                 }]
@@ -464,15 +490,17 @@ app.post('/api/ai/generate',
 
             // 🌾 Precision Agricultural System Prompt
             const systemPrompt = `You are "Kisan AI Pro", the ultimate digital agronomist for FarmConnect. 
-Your goal is to provide world-class, scientific, and actionable agricultural intelligence to farmers. 
+Your goal is to provide world-class, scientific, and actionable agricultural intelligence specifically for farmers. 
 
 Operational Protocols:
-1. **Depth & Precision**: Provide specific scientific names (e.g., *Triticum aestivum* for wheat), exact chemical dosages (e.g., 5ml per liter), and precise sowing windows.
-2. **Contextual Intelligence**: If the user asks about weather, market prices, or pests, give your best expert advice based on current global trends and scientific best practices. 
-3. **Structured Guidance**: Use clear bullet points. Maximize helpfulness while keeping answers readable.
-4. **Local Relevance**: Focus on Indian agricultural contexts but incorporate global innovation (Global + Local = Glocal).
-5. **Tone**: Be an expert mentor—professional, highly knowledgeable, and encouraging.
-6. **Language**: Respond in the same language as the user (English, Hindi, or Punjabi).
+1. **Strict Agricultural Filter**: You MUST ONLY answer questions related to agriculture, farming, crops, livestock, soil health, weather logistics for farming, and rural market intelligence. 
+2. **Refusal Mechanism**: If a user asks a question that is NOT related to the topics above (e.g., general knowledge, politics, sports, entertainment, etc.), you MUST politely decline by saying: "I am sorry, but I am specialized as a digital agronomist to help farmers. I am only able to provide information related to agriculture and farming."
+3. **Depth & Precision**: Provide specific scientific names (e.g., *Triticum aestivum* for wheat), exact chemical dosages (e.g., 5ml per liter), and precise sowing windows.
+4. **Contextual Intelligence**: For weather, market prices, or pests, provide expert advice based on scientific best practices. 
+5. **Structured Guidance**: Use clear bullet points and maximize helpfulness while keeping answers readable.
+6. **Local Relevance**: Focus on Indian agricultural contexts but incorporate global innovation.
+7. **Tone**: Be an expert mentor—professional, highly knowledgeable, and encouraging.
+8. **Language**: Respond in the same language as the user (English, Hindi, or Punjabi).
 
 User Query: ${prompt}`;
 
@@ -506,8 +534,13 @@ app.get('/api/market', async (req, res) => {
         // In a Production environment, we would fetch from Govt Mandi APIs (e.g. data.gov.in)
         // For this high-perf demo, we use an intelligent pattern matching of real-world Mandi trends.
 
-        const basePrice = crop === 'Wheat' ? 2275 : crop === 'Rice' ? 2450 : 3000;
-        const volatility = (Math.random() * 200) - 100;
+        const priceMap = {
+            'Wheat': 2275, 'Rice': 2450, 'Cotton': 7121, 'Maize': 2090, 
+            'Tomato': 1500, 'Potato': 1200, 'Onion': 2500, 'Soybean': 4600,
+            'Mustard': 5450, 'Groundnut': 6377, 'Chickpea': 5335, 'Turmeric': 9000
+        };
+        const basePrice = priceMap[crop] || 3000;
+        const volatility = (Math.random() * (basePrice * 0.05)) - (basePrice * 0.025); // 5% range
 
         const markets = [
             {

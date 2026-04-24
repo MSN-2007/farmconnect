@@ -26,47 +26,39 @@ const AIAssistantPage = () => {
     const messagesEndRef = useRef(null);
     const recognitionRef = useRef(null);
 
-    // Advanced Local Knowledge Base
+    // Advanced Local Knowledge Base (Prioritized by specificity)
     const KNOWLEDGE_BASE = {
-        weather: {
-            keywords: ['weather', 'rain', 'temperature', 'forecast', 'climate', 'monsoon', 'storm', 'wind', 'humidity'],
-            response: "I can provide real-time weather forecasts for your specific location. Please use our 'Weather' page for precise hourly updates, or ask me a specific question about your crop's water needs."
-        },
-        prices: {
-            keywords: ['price', 'rate', 'mandi', 'market', 'cost', 'wheat', 'rice', 'paddy', 'cotton', 'mustard', 'potato', 'onion'],
-            response: "Mandi prices vary by region and timing. For the most accurate rates in your local market, please consult our 'Smart Market Finder' which tracks live data from across India."
+        fertilizer: {
+            keywords: ['fertilizer', 'fert', 'urea', 'dap', 'npk', 'soil nutrient', 'potash', 'phosphorus', 'manure', 'compost', 'zinc', 'boron', 'nutrient management'],
+            response: "Precision fertilization depends on your soil health. Generally, for most crops, apply Urea in split doses. For example, in Cotton, use 2% Urea spray during flowering if growth is stunted. Check your 'Soil Health Card' for exact requirements."
         },
         pests: {
-            keywords: ['pest', 'insect', 'disease', 'fungus', 'leaf', 'yellow', 'bug', 'worm', 'control', 'rust', 'aphid', 'blight', 'whitefly'],
-            response: "For pest control, I recommend using specify treatments based on the crop. Common solutions include Neem Oil (5ml/L) for whiteflies or Propiconazole for rust. Would you like a more detailed scientific plan for a specific pest?"
-        },
-        fertilizer: {
-            keywords: ['fertilizer', 'urea', 'dap', 'npk', 'soil', 'nutrient', 'nitrogen', 'potash', 'manure', 'compost', 'zinc', 'boron'],
-            response: "Precision fertilization depends on your soil test results. Generally, apply Urea in 2-3 split doses for high-demand crops like wheat and rice. check your 'Soil Health Card' for exact requirements."
-        },
-        seeds: {
-            keywords: ['seed', 'variety', 'sow', 'wheat variety', 'best seed', 'hybrid', 'bt cotton', 'certified'],
-            response: "Choosing the right variety is critical. For high yields in 2026, look for Climate-Resilient varieties suited to your state. Our 'Knowledge Hub' has full details on the best performing seeds for this season."
-        },
-        subsidy: {
-            keywords: ['subsidy', 'scheme', 'paisa', 'money', 'government', 'loan', 'pm kisan', 'claim', 'registration'],
-            response: "There are many active government schemes like PM-Kisan and KCC. I recommend checking the official state portals or visiting your nearest Krishi Vigyan Kendra for the latest registration deadlines."
+            keywords: ['pest', 'insect', 'disease', 'fungus', 'leaf', 'yellow', 'bug', 'worm', 'control', 'rust', 'aphid', 'blight', 'whitefly', 'bollworm', 'treatment'],
+            response: "For pest control, specify the symptoms. Common treatments: Neem Oil (5ml/L) for sucking pests or Propiconazole for rust. For Cotton Pink Bollworm, use pheromone traps (5/acre). Would you like a detailed scientific plan?"
         },
         irrigation: {
-            keywords: ['irrigation', 'water', 'drip', 'sprinkler', 'canal', 'borewell', 'tubewell', 'timing', 'moisture'],
-            response: "Optimal irrigation timing is early morning or late evening. For water-scarce areas, Drip Irrigation is highly recommended as it can save up to 60% of water compared to flood irrigation."
+            keywords: ['irrigation', 'water', 'drip', 'sprinkler', 'canal', 'borewell', 'tubewell', 'moisture', 'watering'],
+            response: "Optimal irrigation depends on crop stage. For Cotton, avoid water stress during the flowering/bolling stage. Drip irrigation is highly recommended to save water and improve yield."
         },
-        livestock: {
-            keywords: ['cow', 'buffalo', 'milk', 'fodder', 'cattle', 'veterinary', 'animal', 'feed', 'yield', 'disease'],
-            response: "Healthy livestock requires balanced nutrition. Ensure your cattle have access to clean water and a mix of dry and green fodder. For specific health issues, please consult a qualified veterinarian."
+        weather: {
+            keywords: ['weather', 'rain', 'temperature', 'forecast', 'climate', 'monsoon', 'storm', 'wind', 'humidity'],
+            response: "I can provide weather forecasts for your location. Please check our 'Weather' page for precise updates or ask me specifically how the current rain session will affect your crop."
+        },
+        prices: {
+            keywords: ['mandi price', 'market rate', 'market price', 'rate of', 'cost of', 'wheat price', 'cotton price', 'rice rate', 'mandi bhav'],
+            response: "Mandi prices vary daily. For the most accurate live rates in your local market, please consult our 'Smart Market Finder' page which tracks data from state mandis."
+        },
+        seeds: {
+            keywords: ['seed', 'variety', 'sow', 'wheat variety', 'best seed', 'hybrid', 'bt cotton', 'certified seeds'],
+            response: "Choosing certified varieties is critical. For Cotton, use high-yielding Bt-Cotton hybrids suited to your soil type. Our 'Knowledge Hub' has full details on best performing seeds."
         },
         organic: {
-            keywords: ['organic', 'natural', 'chemical free', 'jeevamrut', 'cow dung', 'pest repellant', 'compost', 'vermicompost'],
-            response: "Organic farming starts with soil health. You can prepare natural boosters like Jeevamrut at home using cow dung and urine. This improves soil life and long-term productivity without chemicals."
+            keywords: ['organic', 'natural farming', 'chemical free', 'jeevamrut', 'cow dung', 'compost', 'vermicompost'],
+            response: "Organic farming starts with soil health. You can prepare natural boosters like 'Jeevamrut' at home using cow dung and urine to improve soil microbiology."
         },
-        storage: {
-            keywords: ['storage', 'warehouse', 'cold store', 'grain', 'moisture level', 'rat', 'safety', 'bags'],
-            response: "To prevent grain loss, ensure crops are dried to under 12% moisture before storage. Use airtight bins or silos to protect your harvest from rodents and moisture-related fungus."
+        livestock: {
+            keywords: ['cow', 'buffalo', 'milk', 'fodder', 'cattle', 'veterinary', 'animal', 'feed', 'yield'],
+            response: "Healthy livestock requires balanced nutrition. Ensure cattle have clean water and a mix of dry/green fodder. Consult a vet for specific health issues."
         }
     };
 
